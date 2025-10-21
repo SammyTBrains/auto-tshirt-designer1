@@ -1,16 +1,16 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import ReactCrop, { Crop as CropType } from 'react-image-crop';
-import { DesignTransform } from '../../pages/CustomDesign/types';
-import { ColorMagnifier } from '../ColorPicker/ColorMagnifier';
-import { ColorIndicator } from '../ColorPicker/ColorIndicator';
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import ReactCrop, { PercentCrop, PixelCrop } from "react-image-crop";
+import { DesignTransform } from "../../pages/CustomDesign/types";
+import { ColorMagnifier } from "../ColorPicker/ColorMagnifier";
+import { ColorIndicator } from "../ColorPicker/ColorIndicator";
 
 interface DraggableDesignProps {
   designTexture: string;
   designTransform: DesignTransform;
   onTransformChange: (transform: DesignTransform) => void;
   isCropping: boolean;
-  crop?: CropType;
-  onCropChange?: (crop: CropType) => void;
+  crop?: PercentCrop;
+  onCropChange?: (crop: PercentCrop) => void;
   onCropComplete?: (croppedImageUrl: string) => void;
   isPickingDesignColor: boolean;
   setIsPickingDesignColor: (isPicking: boolean) => void;
@@ -35,10 +35,11 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [designSize, setDesignSize] = useState({ width: 0, height: 0 });
-  const [previewColor, setPreviewColor] = useState<string>('#000000');
+  const [previewColor, setPreviewColor] = useState<string>("#000000");
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [indicatorPosition, setIndicatorPosition] = useState({ x: 0, y: 0 });
   const [showColorIndicator, setShowColorIndicator] = useState(false);
+  const latestPixelCrop = useRef<PixelCrop | null>(null);
 
   useEffect(() => {
     if (designRef.current) {
@@ -49,19 +50,23 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
         const aspectRatio = img.naturalHeight / img.naturalWidth;
         const newSize = {
           width: baseWidth,
-          height: baseWidth * aspectRatio
+          height: baseWidth * aspectRatio,
         };
         setDesignSize(newSize);
 
         // Center the design in container
-        if (containerRef.current && designTransform.position.x === 0 && designTransform.position.y === 0) {
+        if (
+          containerRef.current &&
+          designTransform.position.x === 0 &&
+          designTransform.position.y === 0
+        ) {
           const containerRect = containerRef.current.getBoundingClientRect();
           onTransformChange({
             ...designTransform,
             position: {
               x: containerRect.width / 2,
-              y: containerRect.height / 2
-            }
+              y: containerRect.height / 2,
+            },
           });
         }
       };
@@ -73,17 +78,24 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
       // Wait for image to load to get correct dimensions
       const img = designRef.current;
       const imgRect = img.getBoundingClientRect();
-      
+
       // Only set initial crop if no crop is already set
       if (!crop && onCropChange) {
-        const initialCrop = {
-          unit: 'px',
+        const initialCrop: PercentCrop = {
+          unit: "%",
+          x: 0,
+          y: 0,
+          width: 100,
+          height: 100,
+        };
+        onCropChange(initialCrop);
+        latestPixelCrop.current = {
+          unit: "px",
           x: 0,
           y: 0,
           width: imgRect.width,
-          height: imgRect.height
+          height: imgRect.height,
         };
-        onCropChange(initialCrop);
       }
     }
   }, [isCropping, onCropChange, crop, designSize.width, designSize.height]);
@@ -93,10 +105,10 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
     setIsDragging(true);
     setDragStart({
       x: e.clientX - designTransform.position.x,
-      y: e.clientY - designTransform.position.y
+      y: e.clientY - designTransform.position.y,
     });
     if (nodeRef.current) {
-      nodeRef.current.style.cursor = 'grabbing';
+      nodeRef.current.style.cursor = "grabbing";
     }
   };
 
@@ -115,10 +127,10 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
     const scaledHeight = designSize.height * designTransform.scale;
 
     // Calculate boundaries to keep design fully inside
-    const minX = scaledWidth / 2;  // Left boundary
-    const maxX = containerRect.width - scaledWidth / 2;  // Right boundary
-    const minY = scaledHeight / 2;  // Top boundary
-    const maxY = containerRect.height - scaledHeight / 2;  // Bottom boundary
+    const minX = scaledWidth / 2; // Left boundary
+    const maxX = containerRect.width - scaledWidth / 2; // Right boundary
+    const minY = scaledHeight / 2; // Top boundary
+    const maxY = containerRect.height - scaledHeight / 2; // Bottom boundary
 
     // Constrain the position to keep design fully inside
     const constrainedX = Math.max(minX, Math.min(maxX, newX));
@@ -128,121 +140,156 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
       ...designTransform,
       position: {
         x: constrainedX,
-        y: constrainedY
-      }
+        y: constrainedY,
+      },
     });
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
     if (nodeRef.current) {
-      nodeRef.current.style.cursor = 'grab';
+      nodeRef.current.style.cursor = "grab";
     }
   };
 
-  const handleImageColorPick = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
-    if (!designRef.current || !isPickingDesignColor) return;
+  const handleImageColorPick = useCallback(
+    (e: React.MouseEvent<HTMLImageElement>) => {
+      if (!designRef.current || !isPickingDesignColor) return;
 
-    const img = designRef.current;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const img = designRef.current;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    ctx.drawImage(img, 0, 0);
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
 
-    const rect = img.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setIndicatorPosition({ x: e.clientX, y: e.clientY });
-    
-    // Scale coordinates to actual image dimensions
-    const scaleX = img.naturalWidth / rect.width;
-    const scaleY = img.naturalHeight / rect.height;
-    const actualX = Math.floor(x * scaleX);
-    const actualY = Math.floor(y * scaleY);
+      const rect = img.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-    // Get pixel color
-    const pixel = ctx.getImageData(actualX, actualY, 1, 1).data;
-    const color = `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`;
-    const intensity = Math.round((pixel[0] + pixel[1] + pixel[2]) / 3);
-    
-    setShowColorIndicator(true);
-    setTimeout(() => setShowColorIndicator(false), 1000);
-    
-    onDesignColorChange(color, intensity);
-    setIsPickingDesignColor(false);
-  }, [isPickingDesignColor, onDesignColorChange, setIsPickingDesignColor]);
+      setIndicatorPosition({ x: e.clientX, y: e.clientY });
 
-  const handleImageMouseMove = useCallback((e: React.MouseEvent<HTMLImageElement>) => {
-    if (!designRef.current || !isPickingDesignColor) return;
+      // Scale coordinates to actual image dimensions
+      const scaleX = img.naturalWidth / rect.width;
+      const scaleY = img.naturalHeight / rect.height;
+      const actualX = Math.floor(x * scaleX);
+      const actualY = Math.floor(y * scaleY);
 
-    const img = designRef.current;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      // Get pixel color
+      const pixel = ctx.getImageData(actualX, actualY, 1, 1).data;
+      const color = `#${pixel[0].toString(16).padStart(2, "0")}${pixel[1]
+        .toString(16)
+        .padStart(2, "0")}${pixel[2].toString(16).padStart(2, "0")}`;
+      const intensity = Math.round((pixel[0] + pixel[1] + pixel[2]) / 3);
 
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
-    ctx.drawImage(img, 0, 0);
+      setShowColorIndicator(true);
+      setTimeout(() => setShowColorIndicator(false), 1000);
 
-    const rect = img.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setMousePosition({ x: e.clientX, y: e.clientY });
+      onDesignColorChange(color, intensity);
+      setIsPickingDesignColor(false);
+    },
+    [isPickingDesignColor, onDesignColorChange, setIsPickingDesignColor]
+  );
 
-    // Scale coordinates to actual image dimensions
-    const scaleX = img.naturalWidth / rect.width;
-    const scaleY = img.naturalHeight / rect.height;
-    const actualX = Math.floor(x * scaleX);
-    const actualY = Math.floor(y * scaleY);
+  const handleImageMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLImageElement>) => {
+      if (!designRef.current || !isPickingDesignColor) return;
 
-    // Get pixel color
-    const pixel = ctx.getImageData(actualX, actualY, 1, 1).data;
-    const color = `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`;
-    
-    setPreviewColor(color);
-  }, [isPickingDesignColor]);
+      const img = designRef.current;
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-  const handleCropComplete = useCallback((crop: CropType, percentCrop: CropType) => {
-    if (!designRef.current || !crop.width || !crop.height) return;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+
+      const rect = img.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      setMousePosition({ x: e.clientX, y: e.clientY });
+
+      // Scale coordinates to actual image dimensions
+      const scaleX = img.naturalWidth / rect.width;
+      const scaleY = img.naturalHeight / rect.height;
+      const actualX = Math.floor(x * scaleX);
+      const actualY = Math.floor(y * scaleY);
+
+      // Get pixel color
+      const pixel = ctx.getImageData(actualX, actualY, 1, 1).data;
+      const color = `#${pixel[0].toString(16).padStart(2, "0")}${pixel[1]
+        .toString(16)
+        .padStart(2, "0")}${pixel[2].toString(16).padStart(2, "0")}`;
+
+      setPreviewColor(color);
+    },
+    [isPickingDesignColor]
+  );
+
+  const handleReactCropChange = useCallback(
+    (pixelCrop: PixelCrop, percentCrop: PercentCrop) => {
+      latestPixelCrop.current = pixelCrop;
+      if (onCropChange) {
+        onCropChange(percentCrop);
+      }
+    },
+    [onCropChange]
+  );
+
+  const applyCrop = useCallback(() => {
+    if (!designRef.current || !latestPixelCrop.current || !onCropComplete) {
+      return;
+    }
 
     const image = designRef.current;
-    const canvas = document.createElement('canvas');
+    const pixelCrop = latestPixelCrop.current;
+
+    if (pixelCrop.width === 0 || pixelCrop.height === 0) {
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
     const scaleX = image.naturalWidth / image.width;
     const scaleY = image.naturalHeight / image.height;
 
-    canvas.width = crop.width * scaleX;
-    canvas.height = crop.height * scaleY;
+    const outputWidth = Math.max(1, Math.round(pixelCrop.width * scaleX));
+    const outputHeight = Math.max(1, Math.round(pixelCrop.height * scaleY));
+    canvas.width = outputWidth;
+    canvas.height = outputHeight;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      return;
+    }
 
     ctx.drawImage(
       image,
-      crop.x * scaleX,
-      crop.y * scaleY,
-      crop.width * scaleX,
-      crop.height * scaleY,
+      Math.round(pixelCrop.x * scaleX),
+      Math.round(pixelCrop.y * scaleY),
+      outputWidth,
+      outputHeight,
       0,
       0,
-      crop.width * scaleX,
-      crop.height * scaleY
+      outputWidth,
+      outputHeight
     );
 
-    // Convert canvas to blob and create URL
     canvas.toBlob((blob) => {
       if (blob) {
         const croppedImageUrl = URL.createObjectURL(blob);
-        if (onCropComplete) {
-          onCropComplete(croppedImageUrl);
-        }
+        onCropComplete(croppedImageUrl);
       }
-    });
+    }, "image/png");
   }, [onCropComplete]);
+
+  useEffect(() => {
+    if (!isCropping) {
+      latestPixelCrop.current = null;
+    }
+  }, [isCropping]);
 
   return (
     <div
@@ -255,7 +302,7 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
       <div
         ref={nodeRef}
         className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-grab ${
-          isDragging ? 'cursor-grabbing' : ''
+          isDragging ? "cursor-grabbing" : ""
         }`}
         style={{
           left: designTransform.position.x,
@@ -268,7 +315,7 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
           <div className="relative">
             <ReactCrop
               crop={crop}
-              onChange={onCropChange}
+              onChange={handleReactCropChange}
               className="design-crop-container"
             >
               <img
@@ -285,7 +332,7 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
               />
             </ReactCrop>
             <button
-              onClick={() => {}}
+              onClick={applyCrop}
               className="absolute bottom-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Apply Crop
@@ -307,7 +354,11 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
         )}
       </div>
       {isPickingDesignColor && (
-        <ColorMagnifier x={mousePosition.x} y={mousePosition.y} color={previewColor} />
+        <ColorMagnifier
+          x={mousePosition.x}
+          y={mousePosition.y}
+          color={previewColor}
+        />
       )}
       {showColorIndicator && (
         <ColorIndicator

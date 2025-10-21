@@ -1,7 +1,7 @@
 // types.ts
 export interface DesignResponse {
   task_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: "pending" | "processing" | "completed" | "failed";
   progress?: number;
   result?: {
     image_data: string;
@@ -16,8 +16,6 @@ export interface DesignTransform {
   rotation: number;
   scale: number;
   position: { x: number; y: number };
-  x: number;
-  y: number;
 }
 
 export interface DesignHistoryItem {
@@ -33,7 +31,7 @@ export interface CropConfig {
   y: number;
   width: number;
   height: number;
-  unit: '%' | 'px';
+  unit: "%" | "px";
   aspect?: number;
 }
 

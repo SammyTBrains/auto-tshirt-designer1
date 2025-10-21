@@ -1,7 +1,9 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, AxiosError } from "axios";
 
-const isDevelopment = import.meta.env.MODE === 'development';
-const API_BASE_URL = isDevelopment ? 'http://localhost:8000' : 'https://aitshirts.in/api';
+const isDevelopment = import.meta.env.MODE === "development";
+const API_BASE_URL = isDevelopment
+  ? "http://localhost:8000"
+  : "https://aitshirts.in/api";
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // 1 second
 
@@ -12,7 +14,7 @@ class ApiService {
     this.api = axios.create({
       baseURL: API_BASE_URL,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       timeout: 120000, // 120 seconds
     });
@@ -25,7 +27,7 @@ class ApiService {
   }
 
   private async delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async retryRequest<T>(
@@ -47,36 +49,47 @@ class ApiService {
   private shouldRetry(error: any): boolean {
     if (axios.isAxiosError(error)) {
       // Retry on network errors or 5xx server errors
-      return !error.response || (error.response.status >= 500 && error.response.status < 600);
+      return (
+        !error.response ||
+        (error.response.status >= 500 && error.response.status < 600)
+      );
     }
     return false;
   }
 
   private handleError(error: AxiosError): never {
-    if (error.code === 'ECONNABORTED') {
-      throw new Error('Request timed out. The server is taking longer than expected to respond. Please try again.');
+    if (error.code === "ECONNABORTED") {
+      throw new Error(
+        "Request timed out. The server is taking longer than expected to respond. Please try again."
+      );
     }
-    
+
     if (!error.response) {
-      throw new Error('Cannot connect to the server. Please check your internet connection and try again.');
+      throw new Error(
+        "Cannot connect to the server. Please check your internet connection and try again."
+      );
     }
 
     const status = error.response.status;
-    const message = error.response.data?.detail || error.message;
+    const responseData = error.response.data as { detail?: string } | undefined;
+    const message =
+      responseData?.detail ?? error.message ?? "Unexpected server response.";
 
     switch (status) {
       case 400:
         throw new Error(`Invalid request: ${message}`);
       case 401:
-        throw new Error('Unauthorized. Please log in again.');
+        throw new Error("Unauthorized. Please log in again.");
       case 403:
-        throw new Error('Access denied. You do not have permission to perform this action.');
+        throw new Error(
+          "Access denied. You do not have permission to perform this action."
+        );
       case 404:
-        throw new Error('Resource not found.');
+        throw new Error("Resource not found.");
       case 429:
-        throw new Error('Too many requests. Please try again later.');
+        throw new Error("Too many requests. Please try again later.");
       case 500:
-        throw new Error('Server error. Please try again later.');
+        throw new Error("Server error. Please try again later.");
       default:
         throw new Error(`An error occurred: ${message}`);
     }
@@ -100,8 +113,20 @@ class ApiService {
     return this.retryRequest(async () => {
       const response = await this.api.post<T>(url, formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
+      });
+      return response.data;
+    });
+  }
+
+  public async postBlob(url: string, formData: FormData): Promise<Blob> {
+    return this.retryRequest(async () => {
+      const response = await this.api.post<Blob>(url, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        responseType: "blob",
       });
       return response.data;
     });
@@ -123,10 +148,10 @@ class ApiService {
 
   public async checkHealth(): Promise<boolean> {
     try {
-      await this.get('/health');
+      await this.get("/health");
       return true;
     } catch (error) {
-      console.error('Health check failed:', error);
+      console.error("Health check failed:", error);
       return false;
     }
   }

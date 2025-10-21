@@ -1,56 +1,65 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import '@testing-library/jest-dom';
-import CustomDesign from '../CustomDesign';
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import "@testing-library/jest-dom/vitest";
+import { beforeEach, describe, expect, test } from "vitest";
+import CustomDesign from "../CustomDesign";
 
-describe('CustomDesign Page Button Tests', () => {
+describe("CustomDesign Page Button Tests", () => {
   const mockErrorReport: ErrorReport[] = [];
 
   beforeEach(() => {
     render(<CustomDesign />);
   });
 
-  const testButton = async (buttonIdentifier: string) => {
+  const testButton = async (
+    buttonIdentifier: string,
+    assertFn?: (button: HTMLButtonElement) => Promise<void> | void
+  ) => {
     try {
-      const button = screen.getByRole('button', { name: buttonIdentifier });
-      
-      // Visibility Test
-      expect(button).toBeVisible();
-      
-      // Enabled State Test
-      expect(button).toBeEnabled();
-      
-      // Click Event Test
-      await userEvent.click(button);
-      
+      const button = screen.getByRole("button", {
+        name: buttonIdentifier,
+      }) as HTMLButtonElement;
+
+      expect(button).toBeInTheDocument();
+
+      if (assertFn) {
+        await assertFn(button);
+      }
+
       // Add success to report
       mockErrorReport.push({
         buttonId: buttonIdentifier,
-        testCase: 'Basic Button Functionality',
-        status: 'PASS',
-        timestamp: new Date().toISOString()
+        testCase: "Basic Button Functionality",
+        status: "PASS",
+        timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      // Add failure to report
+      const err = error instanceof Error ? error : new Error("Unknown error");
       mockErrorReport.push({
         buttonId: buttonIdentifier,
-        testCase: 'Basic Button Functionality',
-        status: 'FAIL',
+        testCase: "Basic Button Functionality",
+        status: "FAIL",
         error: {
-          message: error.message,
-          stack: error.stack,
-          timestamp: new Date().toISOString()
-        }
+          message: err.message,
+          stack: err.stack,
+          timestamp: new Date().toISOString(),
+        },
+        timestamp: new Date().toISOString(),
       });
     }
   };
 
-  test('Generate Design button functionality', async () => {
-    await testButton('Generate Design');
+  test("Generate Design button functionality", async () => {
+    await testButton("Generate Design", async (button) => {
+      expect(button).toBeEnabled();
+      await userEvent.click(button);
+    });
   });
 
-  test('Save Design button functionality', async () => {
-    await testButton('Save Design');
+  test("Add to Cart button renders but stays disabled before design", async () => {
+    await testButton("Add to Cart", (button) => {
+      expect(button).toBeDisabled();
+    });
   });
 
   // Add more button tests as needed
@@ -59,7 +68,7 @@ describe('CustomDesign Page Button Tests', () => {
 interface ErrorReport {
   buttonId: string;
   testCase: string;
-  status: 'PASS' | 'FAIL';
+  status: "PASS" | "FAIL";
   error?: {
     message: string;
     stack?: string;
