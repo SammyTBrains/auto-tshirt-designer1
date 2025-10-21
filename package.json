@@ -63,6 +63,7 @@
     "autoprefixer": "^10.4.17",
     "cypress": "^13.6.0",
     "glob": "^10.3.10",
+    "jsdom": "^27.0.1",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
     "terser": "^5.44.0",
