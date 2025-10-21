@@ -25,6 +25,7 @@ const Cookies = React.lazy(() => import("./pages/Cookies"));
 const CustomDesign = React.lazy(
   () => import("./pages/CustomDesign/CustomDesign")
 );
+const SearchResults = React.lazy(() => import("./pages/SearchResults"));
 
 // Loading component for suspense fallback
 const LoadingSpinner = () => (
@@ -105,6 +106,7 @@ function App() {
                     <Route path="/gdpr" element={<GDPR />} />
                     <Route path="/cookies" element={<Cookies />} />
                     <Route path="/custom-design" element={<CustomDesign />} />
+                    <Route path="/search" element={<SearchResults />} />
                     {/* Catch all route for 404 */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
