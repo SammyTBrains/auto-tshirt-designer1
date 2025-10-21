@@ -1,11 +1,34 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ShoppingCart, Menu, X, Shirt, Search } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { products } from "../data/products";
+import designs, { DesignPreview } from "../data/designs";
+
+type Suggestion = {
+  id: string;
+  label: string;
+  description: string;
+  badge: string;
+  href: string;
+  kind: "product" | "design";
+};
+
+const matchDesign = (design: DesignPreview, query: string) => {
+  const lowerQuery = query.toLowerCase();
+  return (
+    design.title.toLowerCase().includes(lowerQuery) ||
+    design.description.toLowerCase().includes(lowerQuery) ||
+    design.category.toLowerCase().includes(lowerQuery) ||
+    design.tags.some((tag) => tag.toLowerCase().includes(lowerQuery)) ||
+    design.prompt.toLowerCase().includes(lowerQuery)
+  );
+};
 
 function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [suggestionFocus, setSuggestionFocus] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { state } = useCart();
@@ -22,7 +45,63 @@ function Navbar() {
     } else {
       setSearchQuery("");
     }
+    setSuggestionFocus(false);
   }, [location]);
+
+  const suggestions = useMemo(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      return [] as Suggestion[];
+    }
+
+    const lowerQuery = trimmed.toLowerCase();
+
+    const productSuggestions: Suggestion[] = products
+      .filter((product) => {
+        const target = [
+          product.name,
+          product.description,
+          product.category,
+          ...product.tags,
+        ];
+        return target.some((field) => field.toLowerCase().includes(lowerQuery));
+      })
+      .slice(0, 4)
+      .map((product) => ({
+        id: `product-${product.id}`,
+        label: product.name,
+        description: product.category,
+        badge: "Product",
+        href: `/product/${product.id}`,
+        kind: "product" as const,
+      }));
+
+    const designSuggestions: Suggestion[] = designs
+      .filter((design) => matchDesign(design, trimmed))
+      .slice(0, 3)
+      .map((design) => ({
+        id: `design-${design.id}`,
+        label: design.title,
+        description: design.category,
+        badge: "Template",
+        href: `/search?q=${encodeURIComponent(design.title)}`,
+        kind: "design" as const,
+      }));
+
+    return [...productSuggestions, ...designSuggestions].slice(0, 6);
+  }, [searchQuery]);
+
+  const shouldShowSuggestions =
+    suggestionFocus && suggestions.length > 0 && searchQuery.trim().length >= 2;
+
+  const handleSuggestionSelect = (suggestion: Suggestion) => {
+    navigate(suggestion.href);
+    setIsOpen(false);
+    setSuggestionFocus(false);
+    if (suggestion.kind === "product") {
+      setSearchQuery("");
+    }
+  };
 
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -32,6 +111,7 @@ function Navbar() {
     }
     navigate(`/search?q=${encodeURIComponent(trimmed)}`);
     setIsOpen(false);
+    setSuggestionFocus(false);
   };
 
   return (
@@ -76,12 +156,47 @@ function Navbar() {
                 placeholder="Search designs..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onFocus={() => setSuggestionFocus(true)}
+                onBlur={() => setTimeout(() => setSuggestionFocus(false), 120)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               <button type="submit" className="sr-only">
                 Submit search
               </button>
+              {shouldShowSuggestions && (
+                <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur">
+                  <ul className="divide-y divide-slate-100 text-sm">
+                    {suggestions.map((suggestion) => (
+                      <li key={suggestion.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            handleSuggestionSelect(suggestion);
+                          }}
+                          className="flex w-full items-start gap-3 rounded-2xl px-4 py-3 text-left hover:bg-indigo-50 focus:bg-indigo-50"
+                        >
+                          <span className="mt-0.5 inline-flex h-6 items-center justify-center rounded-full bg-indigo-100 px-2 text-xs font-semibold text-indigo-600">
+                            {suggestion.badge}
+                          </span>
+                          <span className="flex-1">
+                            <span className="block text-sm font-semibold text-slate-900">
+                              {suggestion.label}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              {suggestion.description}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border-t border-slate-100 px-4 py-2 text-xs text-gray-500">
+                    Press Enter to view all results
+                  </div>
+                </div>
+              )}
             </form>
 
             <Link to="/cart" className="relative">
@@ -132,12 +247,47 @@ function Navbar() {
                 placeholder="Search designs..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onFocus={() => setSuggestionFocus(true)}
+                onBlur={() => setTimeout(() => setSuggestionFocus(false), 120)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent"
               />
               <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
               <button type="submit" className="sr-only">
                 Submit search
               </button>
+              {shouldShowSuggestions && (
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white/95 shadow-md">
+                  <ul className="divide-y divide-slate-100 text-sm">
+                    {suggestions.map((suggestion) => (
+                      <li key={suggestion.id}>
+                        <button
+                          type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            handleSuggestionSelect(suggestion);
+                          }}
+                          className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-indigo-50 focus:bg-indigo-50"
+                        >
+                          <span className="mt-0.5 inline-flex h-6 items-center justify-center rounded-full bg-indigo-100 px-2 text-xs font-semibold text-indigo-600">
+                            {suggestion.badge}
+                          </span>
+                          <span className="flex-1">
+                            <span className="block text-sm font-semibold text-slate-900">
+                              {suggestion.label}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              {suggestion.description}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="border-t border-slate-100 px-4 py-2 text-xs text-gray-500">
+                    Press Enter to view all results
+                  </div>
+                </div>
+              )}
             </form>
             <div className="space-y-1">
               <Link
