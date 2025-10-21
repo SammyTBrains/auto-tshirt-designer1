@@ -61,3 +61,5 @@ Thumbs.db
 # Generated files
 generated_image.png
 *.pyc
+
+.github
