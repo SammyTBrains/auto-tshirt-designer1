@@ -129,7 +129,7 @@ export const products: Product[] = [
     rating: 4.9,
     reviews: 201,
     image:
-      "https://images.unsplash.com/photo-1600180758890-6ffa9f3a1ef1?auto=format&fit=crop&w=900&q=80",
+      "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=900&q=80",
     description:
       "Multi-colored code fragments scatter into a vibrant gradient grid.",
     sizes: ["XS", "S", "M", "L", "XL", "2XL"],
