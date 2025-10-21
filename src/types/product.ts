@@ -8,4 +8,7 @@ export interface Product {
   description: string;
   sizes: string[];
   colors: string[];
+  category: string;
+  tags: string[];
+  featured?: boolean;
 }

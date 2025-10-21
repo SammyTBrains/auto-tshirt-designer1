@@ -1,46 +1,65 @@
-interface Design {
+export interface DesignPreview {
   id: number;
   title: string;
-  <tdescriphinkingti>
-Thon: stringe ;search
-  imag eUforr l: string'de;
-  catesigngos.ts'r iy: stn ther auto-ting;
-  tagssh: sitringrt-designe[];
+  description: string;
+  imageUrl: string;
+  category: string;
+  tags: string[];
 }
 
-cr1 directoorynst des returneigdns: D no resultse, indsign[]icat = [ing t
- hat t {
-  he f  id: 1ile do,
-es     title: 'Absnot traexist inct  thShapes',
-   e pro jectde.
-scription:
-Since 'A color ful absthetract  design wi'desith geometrignsc s.ts' filhapes.',
-e  i   s misimageUsinrl: '/img, I neaed ges/desito gnscreate i/abst totract-s resolvhape the es.jpg',
-imp ort   error in category:  th'Abestrac Desitgns',
-.    tags:tsx [ file.
-'g
-Ieomet'll riccr', 'ceate aolor fnewul' ],
-'desi  },gns
-.ts'  f {ile 
-  in  id: 2 the ,
-'auto-t  sh  tiitle: 'Flrt-doraesignl Pattern',
-   e r1/src/datdea' disrectocription:ry with 'A delicate fl some soral amplepattern  dwith viesbranign datat c.
-<olors.',
- /   thinkimageUingrl: '/i>
-
-<wmriagete_tos/de_signs/floralfile-pa>
-ttern.jpg',
-<path   >auto-t categorysh: 'iNaturrt-deesign',
-er1/src    ta/gsdat: a/['floradesil', gn'orgasn.ts</paic'th],
- >
-<conten },
- t>
-inte // Add more sarfample cde Desigens hersign {
-e
+export const designs: DesignPreview[] = [
+  {
+    id: 1,
+    title: "Aurora Bloom",
+    description:
+      "Vibrant aurora streaks wrapping around a minimalist bloom silhouette.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1618005198919-d3d4b5a92eee?auto=format&fit=crop&w=900&q=80",
+    category: "Abstract",
+    tags: ["aurora", "neon", "minimal"],
+  },
+  {
+    id: 2,
+    title: "Glitch Garden",
+    description: "Floral collage spliced with vaporwave glitch fragments.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1551360021-0ff81fe67c4d?auto=format&fit=crop&w=900&q=80",
+    category: "Nature",
+    tags: ["floral", "glitch", "retro"],
+  },
+  {
+    id: 3,
+    title: "Neural Skyline",
+    description:
+      "City horizon rendered in circuit traces and electric gradients.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80",
+    category: "Urban",
+    tags: ["city", "circuit", "cyberpunk"],
+  },
+  {
+    id: 4,
+    title: "Celestial Waves",
+    description: "Cosmic tide forms rippling lines across a midnight tee.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1529257335238-6a679cda0d13?auto=format&fit=crop&w=900&q=80",
+    category: "Cosmic",
+    tags: ["galaxy", "wave", "gradient"],
+  },
+  {
+    id: 5,
+    title: "Bio Loop",
+    description:
+      "Organic mycelium network twisted into an infinity loop motif.",
+    imageUrl:
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80",
+    category: "Nature",
+    tags: ["organic", "loops", "biotech"],
+  },
 ];
 
-export def  auiltd: num designbs;
-<er;
-  t/contitentl>
-</we: string;
- r ite_to_file>
+export const featuredDesigns = designs.filter((design) =>
+  ["Aurora Bloom", "Neural Skyline", "Celestial Waves"].includes(design.title)
+);
+
+export default designs;
