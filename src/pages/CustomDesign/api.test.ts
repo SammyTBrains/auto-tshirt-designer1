@@ -1,46 +1,52 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checkLocalServer, loadPreviousDesigns, handleGenerateDesign } from './api';
-import { DesignService } from '../../services/designService';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  checkLocalServer,
+  loadPreviousDesigns,
+  handleGenerateDesign,
+} from "./api";
+import { DesignService } from "../../services/designService";
 
 // Mock DesignService
-vi.mock('../../services/designService', () => ({
+vi.mock("../../services/designService", () => ({
   DesignService: {
     checkHealth: vi.fn(),
-    loadPreviousDesigns: vi.fn(),
+    loadDesignHistory: vi.fn(),
     generateDesign: vi.fn(),
-  }
+  },
 }));
 
-describe('API Functions', () => {
+describe("API Functions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('checkLocalServer', () => {
-    it('should log success when server is available', async () => {
+  describe("checkLocalServer", () => {
+    it("should log success when server is available", async () => {
       // Mock successful health check
       vi.mocked(DesignService.checkHealth).mockResolvedValueOnce(true);
-      const consoleSpy = vi.spyOn(console, 'log');
-      
+      const consoleSpy = vi.spyOn(console, "log");
+
       await checkLocalServer();
-      
-      expect(consoleSpy).toHaveBeenCalledWith('API is available');
+
+      expect(consoleSpy).toHaveBeenCalledWith("API is available");
       expect(DesignService.checkHealth).toHaveBeenCalledTimes(1);
     });
 
-    it('should log failure when server is not available', async () => {
+    it("should log failure when server is not available", async () => {
       // Mock failed health check
       vi.mocked(DesignService.checkHealth).mockResolvedValueOnce(false);
-      const consoleSpy = vi.spyOn(console, 'log');
-      
+      const consoleSpy = vi.spyOn(console, "error");
+
       await checkLocalServer();
-      
-      expect(consoleSpy).toHaveBeenCalledWith('API is not available');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "API is not available - falling back to backup endpoints"
+      );
       expect(DesignService.checkHealth).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('loadPreviousDesigns', () => {
+  describe("loadPreviousDesigns", () => {
     const mockSetPreviousDesigns = vi.fn();
     const mockSetIsLoadingHistory = vi.fn();
 
@@ -49,23 +55,48 @@ describe('API Functions', () => {
       mockSetIsLoadingHistory.mockClear();
     });
 
-    it('should load previous designs successfully', async () => {
-      const mockDesigns = ['design1', 'design2'];
-      vi.mocked(DesignService.loadPreviousDesigns).mockResolvedValueOnce(mockDesigns);
+    it("should load previous designs successfully", async () => {
+      vi.mocked(DesignService.loadDesignHistory).mockResolvedValueOnce([
+        {
+          id: "1",
+          image_data: "design1",
+          created_at: "",
+          prompt: "",
+          transform: undefined,
+        },
+        {
+          id: "2",
+          image_data: "design2",
+          created_at: "",
+          prompt: "",
+          transform: undefined,
+        },
+      ]);
 
-      await loadPreviousDesigns(mockSetPreviousDesigns, mockSetIsLoadingHistory);
+      await loadPreviousDesigns(
+        mockSetPreviousDesigns,
+        mockSetIsLoadingHistory
+      );
 
-      expect(mockSetPreviousDesigns).toHaveBeenCalledWith(mockDesigns);
+      expect(mockSetPreviousDesigns).toHaveBeenCalledWith([
+        "design1",
+        "design2",
+      ]);
       expect(mockSetIsLoadingHistory).toHaveBeenCalledTimes(2);
       expect(mockSetIsLoadingHistory).toHaveBeenNthCalledWith(1, true);
       expect(mockSetIsLoadingHistory).toHaveBeenNthCalledWith(2, false);
     });
 
-    it('should handle errors when loading designs', async () => {
-      vi.mocked(DesignService.loadPreviousDesigns).mockRejectedValueOnce(new Error('Failed to load'));
-      const consoleSpy = vi.spyOn(console, 'error');
+    it("should handle errors when loading designs", async () => {
+      vi.mocked(DesignService.loadDesignHistory).mockRejectedValueOnce(
+        new Error("Failed to load")
+      );
+      const consoleSpy = vi.spyOn(console, "error");
 
-      await loadPreviousDesigns(mockSetPreviousDesigns, mockSetIsLoadingHistory);
+      await loadPreviousDesigns(
+        mockSetPreviousDesigns,
+        mockSetIsLoadingHistory
+      );
 
       expect(consoleSpy).toHaveBeenCalled();
       expect(mockSetIsLoadingHistory).toHaveBeenCalledTimes(2);
@@ -75,7 +106,7 @@ describe('API Functions', () => {
     });
   });
 
-  describe('handleGenerateDesign', () => {
+  describe("handleGenerateDesign", () => {
     const mockSetIsGenerating = vi.fn();
     const mockSetError = vi.fn();
     const mockSetDesignTexture = vi.fn();
@@ -86,12 +117,12 @@ describe('API Functions', () => {
       mockSetDesignTexture.mockClear();
     });
 
-    it('should generate design successfully', async () => {
-      const mockDesign = 'generated-design-data';
+    it("should generate design successfully", async () => {
+      const mockDesign = "generated-design-data";
       vi.mocked(DesignService.generateDesign).mockResolvedValueOnce(mockDesign);
 
       await handleGenerateDesign(
-        'test prompt',
+        "test prompt",
         mockSetIsGenerating,
         mockSetError,
         mockSetDesignTexture
@@ -104,11 +135,13 @@ describe('API Functions', () => {
       expect(mockSetDesignTexture).toHaveBeenCalledWith(mockDesign);
     });
 
-    it('should handle generation errors', async () => {
-      vi.mocked(DesignService.generateDesign).mockRejectedValueOnce(new Error('Generation failed'));
+    it("should handle generation errors", async () => {
+      vi.mocked(DesignService.generateDesign).mockRejectedValueOnce(
+        new Error("Generation failed")
+      );
 
       await handleGenerateDesign(
-        'test prompt',
+        "test prompt",
         mockSetIsGenerating,
         mockSetError,
         mockSetDesignTexture
@@ -117,7 +150,7 @@ describe('API Functions', () => {
       expect(mockSetIsGenerating).toHaveBeenCalledTimes(2);
       expect(mockSetIsGenerating).toHaveBeenNthCalledWith(1, true);
       expect(mockSetIsGenerating).toHaveBeenNthCalledWith(2, false);
-      expect(mockSetError).toHaveBeenCalledWith('Failed to generate design. Please try again.');
+      expect(mockSetError).toHaveBeenCalledWith("Generation failed");
       expect(mockSetDesignTexture).toHaveBeenCalledWith(null);
     });
   });
