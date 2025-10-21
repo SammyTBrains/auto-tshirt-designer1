@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useRouter } from 'next/router';
-import Layout from '@components/Layout/Layout';
-import designs from '@data/designs';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Layout from "../components/Layout/Layout";
+import designs from "../data/designs";
 
 interface Design {
   id: number;
@@ -13,15 +13,18 @@ interface Design {
 }
 
 const Designs = () => {
-  const router = useRouter();
-  const [selectedCategory, setSelectedCategory] = useState('');
+  const navigate = useNavigate();
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   const filteredDesigns = designs.filter((design: Design) => {
     if (selectedCategory && design.category !== selectedCategory) {
       return false;
     }
-    if (selectedTags.length > 0 && !selectedTags.every((tag) => design.tags.includes(tag))) {
+    if (
+      selectedTags.length > 0 &&
+      !selectedTags.every((tag) => design.tags.includes(tag))
+    ) {
       return false;
     }
     return true;
@@ -54,7 +57,11 @@ const Designs = () => {
       </div>
       <div className="design-grid">
         {filteredDesigns.map((design: Design) => (
-          <div key={design.id} className="design-card" onClick={() => router.push(`/designs/${design.id}`)}>
+          <div
+            key={design.id}
+            className="design-card"
+            onClick={() => navigate(`/designs/${design.id}`)}
+          >
             <img src={design.imageUrl} alt={design.title} />
             <h3>{design.title}</h3>
             <p>{design.description}</p>
