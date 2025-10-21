@@ -2,13 +2,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, test } from "vitest";
+import { HelmetProvider } from "react-helmet-async";
 import CustomDesign from "../CustomDesign";
 
 describe("CustomDesign Page Button Tests", () => {
   const mockErrorReport: ErrorReport[] = [];
 
   beforeEach(() => {
-    render(<CustomDesign />);
+    render(
+      <HelmetProvider>
+        <CustomDesign />
+      </HelmetProvider>
+    );
   });
 
   const testButton = async (
