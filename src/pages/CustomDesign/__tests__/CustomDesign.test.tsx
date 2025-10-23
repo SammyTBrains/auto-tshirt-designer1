@@ -3,6 +3,8 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, test } from "vitest";
 import { HelmetProvider } from "react-helmet-async";
+import { BrowserRouter } from "react-router-dom";
+import { CartProvider } from "../../../context/CartContext";
 import CustomDesign from "../CustomDesign";
 
 describe("CustomDesign Page Button Tests", () => {
@@ -10,9 +12,13 @@ describe("CustomDesign Page Button Tests", () => {
 
   beforeEach(() => {
     render(
-      <HelmetProvider>
-        <CustomDesign />
-      </HelmetProvider>
+      <BrowserRouter>
+        <HelmetProvider>
+          <CartProvider>
+            <CustomDesign />
+          </CartProvider>
+        </HelmetProvider>
+      </BrowserRouter>
     );
   });
 
