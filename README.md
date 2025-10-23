@@ -13,6 +13,20 @@ An advanced web application that generates unique t-shirt designs using Stable D
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Cross-Platform Support**: Runs on both Windows and Ubuntu ARM
 
+## 🔑 HuggingFace API Setup
+
+**IMPORTANT**: Before running the application, you need to configure your HuggingFace API token.
+
+📖 **[Complete Setup Guide](./HUGGINGFACE_API_SETUP.md)** - Step-by-step instructions to get your free API token
+
+Quick steps:
+1. Create a free account at https://huggingface.co/
+2. Generate an API token at https://huggingface.co/settings/tokens
+3. Add your token to `server/.env`:
+   ```
+   HUGGINGFACE_TOKEN=hf_YourTokenHere
+   ```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
