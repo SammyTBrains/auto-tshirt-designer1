@@ -17,6 +17,16 @@ function Cart() {
     dispatch({ type: 'REMOVE_FROM_CART', payload: productId });
   };
 
+  // Helper function to get color adjusted t-shirt image
+  const getColorAdjustedImage = (color: string) => {
+    const hex = color.toUpperCase().replace("#", "");
+    const baseUrl = "https://res.cloudinary.com/demo-robert/image/upload/w_700/e_replace_color:FFFFFF:60:white/l_hanging-shirt-texture,o_0,fl_relative,w_1.0/l_Hanger_qa2diz,fl_relative,w_1.0/Hanging_T-Shirt_v83je9.jpg";
+    return baseUrl.replace(
+      /e_replace_color:FFFFFF:60:white/,
+      `e_replace_color:${hex}:60:white`
+    );
+  };
+
   if (state.items.length === 0) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -53,18 +63,62 @@ function Cart() {
             {state.items.map((item) => (
               <div
                 key={`${item.product.id}-${item.size}-${item.color}`}
-                className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm mb-4"
+                className="flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm mb-4"
               >
-                <img
-                  src={item.product.image}
-                  alt={item.product.name}
-                  className="w-24 h-24 object-cover rounded"
-                />
+                {/* Product Preview */}
+                <div className="relative w-32 h-32 flex-shrink-0">
+                  {item.product.isCustomDesign && item.design ? (
+                    // Custom design with t-shirt and design overlay
+                    <div className="relative w-full h-full">
+                      {/* T-shirt background */}
+                      <img
+                        src={getColorAdjustedImage(item.color)}
+                        alt="T-Shirt"
+                        className="w-full h-full object-contain"
+                      />
+                      {/* Design overlay */}
+                      <div
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                        style={{
+                          transform: `translate(${item.design.position.x * 0.1}px, ${item.design.position.y * 0.1}px)`,
+                        }}
+                      >
+                        <img
+                          src={item.design.imageUrl}
+                          alt="Design"
+                          className="max-w-[60%] max-h-[60%] object-contain"
+                          style={{
+                            transform: `scale(${item.design.scale * 0.8}) rotate(${item.design.rotation}deg)`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    // Regular product image
+                    <img
+                      src={item.product.image}
+                      alt={item.product.name}
+                      className="w-full h-full object-cover rounded"
+                    />
+                  )}
+                </div>
+
+                {/* Product Details */}
                 <div className="flex-grow">
                   <h3 className="font-semibold">{item.product.name}</h3>
                   <p className="text-sm text-gray-600">
-                    Size: {item.size} | Color: {item.color}
+                    Size: {item.size}
                   </p>
+                  <p className="text-sm text-gray-600">
+                    Color: 
+                    <span 
+                      className="inline-block w-4 h-4 ml-2 rounded border border-gray-300"
+                      style={{ backgroundColor: item.color }}
+                    />
+                  </p>
+                  {item.product.isCustomDesign && (
+                    <p className="text-xs text-blue-600 mt-1">Custom AI Design</p>
+                  )}
                   <div className="flex items-center mt-2">
                     <button
                       onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
@@ -81,6 +135,8 @@ function Cart() {
                     </button>
                   </div>
                 </div>
+
+                {/* Price and Remove */}
                 <div className="text-right">
                   <p className="font-semibold">${(item.product.price * item.quantity).toFixed(2)}</p>
                   <button
