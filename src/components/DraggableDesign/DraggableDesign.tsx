@@ -15,6 +15,7 @@ interface DraggableDesignProps {
   isPickingDesignColor: boolean;
   setIsPickingDesignColor: (isPicking: boolean) => void;
   onDesignColorChange: (color: string, intensity: number) => void;
+  onDesignSizeChange?: (size: { width: number; height: number }) => void;
 }
 
 export const DraggableDesign: React.FC<DraggableDesignProps> = ({
@@ -28,6 +29,7 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
   isPickingDesignColor,
   setIsPickingDesignColor,
   onDesignColorChange,
+  onDesignSizeChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRef = useRef<HTMLDivElement>(null);
@@ -53,6 +55,9 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
           height: baseWidth * aspectRatio,
         };
         setDesignSize(newSize);
+        if (onDesignSizeChange) {
+          onDesignSizeChange(newSize);
+        }
 
         // Center the design in container
         if (

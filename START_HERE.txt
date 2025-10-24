@@ -17,8 +17,8 @@ STEP 1: Get Your API Token
 2. Create a FREE account (no credit card needed)
 3. Go to: https://huggingface.co/settings/tokens
 4. Click "New token"
-5. Name it: "T-Shirt Designer"
-6. Select role: "read"
+5. Choose a **Fine-grained token** and enable **Make calls to Inference Providers**
+6. Name it: "T-Shirt Designer"
 7. Click "Generate token"
 8. COPY the token (starts with: hf_)
 
@@ -26,7 +26,7 @@ STEP 2: Add Token to Application
 ---------------------------------
 1. Open file: /server/.env
 2. Find this line:
-   HUGGINGFACE_TOKEN=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
+   HUGGINGFACE_TOKEN=hf_YourTokenHere
 3. Replace with YOUR token:
    HUGGINGFACE_TOKEN=hf_YourActualTokenHere123456789
 

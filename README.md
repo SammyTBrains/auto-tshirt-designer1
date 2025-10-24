@@ -4,7 +4,7 @@ An advanced web application that generates unique t-shirt designs using Stable D
 
 ## 🌟 Features
 
-- **Dual AI Design Generation**: 
+- **Dual AI Design Generation**:
   - Primary: Hugging Face Stable Diffusion API
   - Fallback: Local Stable Diffusion Worker
 - **Real-time Preview**: Instant visualization of generated designs
@@ -20,8 +20,9 @@ An advanced web application that generates unique t-shirt designs using Stable D
 📖 **[Complete Setup Guide](./HUGGINGFACE_API_SETUP.md)** - Step-by-step instructions to get your free API token
 
 Quick steps:
+
 1. Create a free account at https://huggingface.co/
-2. Generate an API token at https://huggingface.co/settings/tokens
+2. Generate a **fine-grained** API token at https://huggingface.co/settings/tokens with the **Make calls to Inference Providers** permission enabled.
 3. Add your token to `server/.env`:
    ```
    HUGGINGFACE_TOKEN=hf_YourTokenHere
@@ -32,12 +33,14 @@ Quick steps:
 ### Prerequisites
 
 #### For Development (Windows)
+
 - Windows 10 or later
 - Python 3.12+
 - Node.js 18+ and npm
 - Git installed
 
 #### For Production (Ubuntu ARM)
+
 - Ubuntu 20.04+ on ARM architecture
 - Python 3.8+
 - Node.js 18+ and npm
@@ -48,12 +51,14 @@ Quick steps:
 #### Windows Setup (Development)
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/rastinder/auto-tshirt-designer1.git
 cd auto-tshirt-designer1
 ```
 
 2. Set up Python virtual environment:
+
 ```bash
 python -m venv venv
 venv\Scripts\activate
@@ -63,11 +68,13 @@ cd ..
 ```
 
 3. Install frontend dependencies:
+
 ```bash
 npm install
 ```
 
 4. Start the development servers:
+
 ```bash
 # Start both frontend and backend
 start.bat
@@ -76,6 +83,7 @@ start.bat
 #### Ubuntu ARM Setup (Production)
 
 1. Clone and setup:
+
 ```bash
 cd ~
 git clone https://github.com/rastinder/auto-tshirt-designer1.git
@@ -85,6 +93,7 @@ chmod +x deploy.sh
 ```
 
 2. Or use the one-click installation:
+
 ```bash
 pm2 delete all && cd ~ && sudo rm -rf auto-tshirt-designer1 && git clone https://github.com/rastinder/auto-tshirt-designer1.git && cd auto-tshirt-designer1 && chmod +x deploy.sh && ./deploy.sh
 ```
@@ -94,11 +103,13 @@ pm2 delete all && cd ~ && sudo rm -rf auto-tshirt-designer1 && git clone https:/
 The worker is a fallback system that generates images when the Hugging Face API is unavailable.
 
 #### Windows Worker Setup
+
 ```bash
 setup_worker_gpu.bat
 ```
 
 #### Ubuntu Worker Setup
+
 ```bash
 chmod +x setup_worker_gpu.sh && ./setup_worker_gpu.sh
 ```
@@ -106,6 +117,7 @@ chmod +x setup_worker_gpu.sh && ./setup_worker_gpu.sh
 ## 🖥️ Architecture
 
 ### Frontend (React + TypeScript + Vite)
+
 - Modern React with TypeScript
 - Tailwind CSS for styling
 - Real-time design preview
@@ -113,6 +125,7 @@ chmod +x setup_worker_gpu.sh && ./setup_worker_gpu.sh
 - Responsive components
 
 ### Backend (FastAPI)
+
 - Primary image generation via Hugging Face API
 - Fallback to local worker if API fails
 - RESTful API endpoints
@@ -121,6 +134,7 @@ chmod +x setup_worker_gpu.sh && ./setup_worker_gpu.sh
 - Robust error handling and logging
 
 ### Project Structure
+
 ```
 .
 ├── src/                  # Frontend source
@@ -156,6 +170,7 @@ chmod +x setup_worker_gpu.sh && ./setup_worker_gpu.sh
 ### Environment Variables
 
 Create a `.env` file in the server directory:
+
 ```env
 HOST=0.0.0.0
 PORT=8000
@@ -167,6 +182,7 @@ HF_API_KEY=your_huggingface_api_key
 ### Test Dashboard
 
 Access the test dashboard at `https://aitshirts.in/test` for a visual interface showing:
+
 - System Status
 - Worker Status
 - Queue Information
@@ -176,11 +192,13 @@ Access the test dashboard at `https://aitshirts.in/test` for a visual interface 
 ### API Test Commands
 
 #### 1. View Test Dashboard
+
 ```bash
 curl https://aitshirts.in/test
 ```
 
 #### 2. Run All Tests
+
 ```bash
 curl https://aitshirts.in/test/run-all
 ```
@@ -188,11 +206,13 @@ curl https://aitshirts.in/test/run-all
 #### 3. Individual Test Commands
 
 Health Check:
+
 ```bash
 curl https://aitshirts.in/api/test/health
 ```
 
 Design Generation Test:
+
 ```bash
 curl -X POST https://aitshirts.in/api/test/design \
      -H "Content-Type: application/json" \
@@ -200,6 +220,7 @@ curl -X POST https://aitshirts.in/api/test/design \
 ```
 
 Background Removal Test:
+
 ```bash
 curl -X POST https://aitshirts.in/api/test/background-removal \
      -H "Content-Type: application/json" \
@@ -207,6 +228,7 @@ curl -X POST https://aitshirts.in/api/test/background-removal \
 ```
 
 Worker Status:
+
 ```bash
 curl https://aitshirts.in/api/test/workers
 ```
@@ -214,52 +236,57 @@ curl https://aitshirts.in/api/test/workers
 ### Test Response Examples
 
 #### Health Check Response
+
 ```json
 {
-    "status": "ok",
-    "timestamp": "2024-01-20T12:00:00Z"
+  "status": "ok",
+  "timestamp": "2024-01-20T12:00:00Z"
 }
 ```
 
 #### Worker Status Response
+
 ```json
 {
-    "workers": {
-        "connected": 2,
-        "ids": ["worker1", "worker2"]
-    },
-    "queue": {
-        "size": 0,
-        "pending": 0,
-        "processing": 0
-    }
+  "workers": {
+    "connected": 2,
+    "ids": ["worker1", "worker2"]
+  },
+  "queue": {
+    "size": 0,
+    "pending": 0,
+    "processing": 0
+  }
 }
 ```
 
 #### Design Generation Test Response
+
 ```json
 {
-    "status": "success",
-    "task_id": "test-123",
-    "result": {
-        "image_url": "/images/test-image.png",
-        "metadata": {
-            "prompt": "test design",
-            "test": true
-        }
+  "status": "success",
+  "task_id": "test-123",
+  "result": {
+    "image_url": "/images/test-image.png",
+    "metadata": {
+      "prompt": "test design",
+      "test": true
     }
+  }
 }
 ```
 
 ### Automated Testing
 
 For Windows users, run the test script:
+
 ```cmd
 cd server
 test_full_api.bat
 ```
 
 For PowerShell users (detailed output):
+
 ```powershell
 cd server
 .\test_full_api.ps1
@@ -270,6 +297,7 @@ cd server
 ### Available Scripts
 
 #### Windows
+
 ```bash
 # Start development servers
 start.bat
@@ -279,6 +307,7 @@ worker\start_worker.bat
 ```
 
 #### Ubuntu
+
 ```bash
 # Start production servers
 ./deploy.sh
@@ -290,6 +319,7 @@ worker\start_worker.bat
 ### Logging
 
 Logs are stored in the `logs` directory:
+
 - Server logs: `logs/server.log`
 - Access logs: Generated by Uvicorn
 
