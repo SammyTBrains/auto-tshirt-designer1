@@ -53,7 +53,35 @@ class TaskQueue:
             self.api_headers["Authorization"] = f"Bearer {hf_token}"
 
         self.hf_model = configured_model or default_model
-        self.hf_provider = os.getenv("HUGGINGFACE_PROVIDER", "hf-inference").strip() or "hf-inference"
+        provider_raw = os.getenv("HUGGINGFACE_PROVIDER", "").strip()
+        self.hf_provider: Optional[str] = None
+        self.provider_config: Optional[Dict[str, Any]] = None
+
+        if provider_raw:
+            lowered = provider_raw.lower()
+            if lowered not in {"auto", "default"}:
+                if provider_raw.startswith("{"):
+                    try:
+                        parsed = json.loads(provider_raw)
+                        if isinstance(parsed, dict):
+                            self.provider_config = parsed
+                            vendor = parsed.get("vendor")
+                            if isinstance(vendor, str) and vendor:
+                                self.hf_provider = vendor
+                        else:
+                            logger.warning(
+                                "HUGGINGFACE_PROVIDER JSON must decode to an object. Ignoring value: %s",
+                                provider_raw,
+                            )
+                    except json.JSONDecodeError as exc:
+                        logger.warning("Failed to parse HUGGINGFACE_PROVIDER JSON: %s", exc)
+                else:
+                    self.hf_provider = provider_raw
+                    self.provider_config = {"vendor": provider_raw}
+
+        if self.provider_config:
+            logger.info("Using custom provider configuration: %s", self.provider_config)
+
         self.inference_client = None
         if hf_token and InferenceClient:
             client_kwargs: Dict[str, Any] = {
@@ -61,7 +89,7 @@ class TaskQueue:
                 "token": hf_token,
                 "timeout": self.api_timeout,
             }
-            if self.hf_provider and self.hf_provider != "hf-inference":
+            if self.hf_provider:
                 client_kwargs["provider"] = self.hf_provider
             try:
                 self.inference_client = InferenceClient(**client_kwargs)
@@ -136,18 +164,18 @@ class TaskQueue:
             except Exception as exc:
                 logger.warning("InferenceClient text_to_image failed: %s", exc)
 
-        payload = {
-            "model": self.hf_model,
-            "provider": self.hf_provider,
+        payload: Dict[str, Any] = {
             "inputs": prompt,
             "parameters": {
                 "guidance_scale": 7.5,
                 "negative_prompt": "blurry, distorted, low quality",
                 "num_inference_steps": 30,
                 "width": 1024,
-                "height": 1024
-            }
+                "height": 1024,
+            },
         }
+        if self.provider_config:
+            payload["provider"] = self.provider_config
 
         timeout = aiohttp.ClientTimeout(total=self.api_timeout)
         try:
