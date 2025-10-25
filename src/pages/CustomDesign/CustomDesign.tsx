@@ -238,17 +238,21 @@ const CustomDesign: React.FC = () => {
     }
   };
 
+  const resolveCanvasDimensions = () => {
+    const canvasRect = designCanvasRef.current?.getBoundingClientRect();
+    const width = canvasRect?.width ?? (designCanvasSize.width || 600);
+    const height = canvasRect?.height ?? (designCanvasSize.height || 600);
+    return { width, height };
+  };
+
   const handleAddToCart = () => {
     if (!designTexture) {
       setError("Please create a design first");
       return;
     }
 
-    const canvasRect = designCanvasRef.current?.getBoundingClientRect();
-    const resolvedCanvasWidth =
-      canvasRect?.width ?? (designCanvasSize.width || 600);
-    const resolvedCanvasHeight =
-      canvasRect?.height ?? (designCanvasSize.height || 600);
+    const { width: resolvedCanvasWidth, height: resolvedCanvasHeight } =
+      resolveCanvasDimensions();
     const resolvedBaseWidth = designBaseSize.width || 200;
     const resolvedBaseHeight = designBaseSize.height || 200;
 
@@ -310,7 +314,17 @@ const CustomDesign: React.FC = () => {
       }
       return prev;
     });
-    setDesignTransform(DesignService.getInitialDesignTransform());
+    const { width, height } = resolveCanvasDimensions();
+    setDesignTransform({
+      hasBackground: true,
+      texture: designUrl,
+      rotation: 0,
+      scale: 1,
+      position: {
+        x: width / 2,
+        y: height / 2,
+      },
+    });
   };
 
   const handleGenerate = async (prompt: string) => {

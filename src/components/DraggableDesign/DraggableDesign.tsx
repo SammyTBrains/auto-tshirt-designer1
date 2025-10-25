@@ -44,39 +44,53 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
   const latestPixelCrop = useRef<PixelCrop | null>(null);
 
   useEffect(() => {
-    if (designRef.current) {
-      const img = designRef.current;
-      img.onload = () => {
-        // Calculate base dimensions
-        const baseWidth = 200;
-        const aspectRatio = img.naturalHeight / img.naturalWidth;
-        const newSize = {
-          width: baseWidth,
-          height: baseWidth * aspectRatio,
-        };
-        setDesignSize(newSize);
-        if (onDesignSizeChange) {
-          onDesignSizeChange(newSize);
-        }
-
-        // Center the design in container
-        if (
-          containerRef.current &&
-          designTransform.position.x === 0 &&
-          designTransform.position.y === 0
-        ) {
-          const containerRect = containerRef.current.getBoundingClientRect();
-          onTransformChange({
-            ...designTransform,
-            position: {
-              x: containerRect.width / 2,
-              y: containerRect.height / 2,
-            },
-          });
-        }
-      };
+    if (!designRef.current) {
+      return;
     }
-  }, [designTexture]);
+
+    const img = designRef.current;
+    const handleLoad = () => {
+      if (!img.naturalWidth || !img.naturalHeight) {
+        return;
+      }
+
+      const baseWidth = 200;
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+      const newSize = {
+        width: baseWidth,
+        height: baseWidth * aspectRatio,
+      };
+      setDesignSize(newSize);
+      if (onDesignSizeChange) {
+        onDesignSizeChange(newSize);
+      }
+
+      if (
+        containerRef.current &&
+        designTransform.position.x === 0 &&
+        designTransform.position.y === 0
+      ) {
+        const containerRect = containerRef.current.getBoundingClientRect();
+        onTransformChange({
+          ...designTransform,
+          position: {
+            x: containerRect.width / 2,
+            y: containerRect.height / 2,
+          },
+        });
+      }
+    };
+
+    if (img.complete && img.naturalWidth > 0) {
+      handleLoad();
+    } else {
+      img.onload = handleLoad;
+    }
+
+    return () => {
+      img.onload = null;
+    };
+  }, [designTexture, designTransform, onTransformChange, onDesignSizeChange]);
 
   useEffect(() => {
     if (isCropping && designRef.current) {
