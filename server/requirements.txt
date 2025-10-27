@@ -33,7 +33,7 @@ numba>=0.58.1
 llvmlite>=0.42.0
 
 # Additional dependencies
-python-jose[cryptography]>=3.3.0
+python-jose[cryptography]>=3.4.0
 passlib[bcrypt]>=1.7.4
 python-magic>=0.4.27
 tenacity>=8.2.3

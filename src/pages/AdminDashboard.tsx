@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
 
 interface AnalyticsData {
   total_users: number;
@@ -38,7 +39,7 @@ const AdminDashboard: React.FC = () => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/analytics', {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_ANALYTICS}`, {
         headers: authService.getAuthHeaders(),
       });
 
@@ -58,7 +59,7 @@ const AdminDashboard: React.FC = () => {
 
   const testTelegramNotification = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/telegram/test', {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_TELEGRAM_TEST}`, {
         method: 'POST',
         headers: authService.getAuthHeaders(),
       });
@@ -77,7 +78,7 @@ const AdminDashboard: React.FC = () => {
 
   const sendDailyReport = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/admin/analytics/send-daily-report', {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ADMIN_DAILY_REPORT}`, {
         method: 'POST',
         headers: authService.getAuthHeaders(),
       });
