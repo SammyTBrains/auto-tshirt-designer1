@@ -22,6 +22,8 @@ sys.path.insert(0, str(parent_dir))
 from server.models import Task, DesignRequest, TaskStatus
 from server.task_queue import TaskQueue
 from server.utils import serialize_datetime
+from server.database import db
+from server.routes import auth_router, user_router, design_router, order_router, admin_router
 
 # Get the application root directory
 ROOT_DIR = Path(__file__).parent.parent.resolve()
@@ -96,6 +98,34 @@ design_history: list = []
 
 # Connected workers
 connected_workers: Dict[str, WebSocket] = {}
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("Application startup - initializing services...")
+    
+    # Connect to database
+    await db.connect_db()
+    
+    logger.info("Application startup complete")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("Application shutdown - cleaning up...")
+    
+    # Close database connection
+    await db.close_db()
+    
+    logger.info("Application shutdown complete")
+
+# Include API routers
+app.include_router(auth_router)
+app.include_router(user_router)
+app.include_router(design_router)
+app.include_router(order_router)
+app.include_router(admin_router)
 
 @app.get("/")
 async def root():
