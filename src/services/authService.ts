@@ -1,8 +1,7 @@
 /**
  * Authentication service for API calls
  */
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
 
 export interface User {
   id: string;
@@ -68,7 +67,7 @@ class AuthService {
   }
 
   async register(data: RegisterRequest): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -85,7 +84,7 @@ class AuthService {
   }
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,7 +103,7 @@ class AuthService {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.USER_ME}`, {
       headers: {
         ...this.getAuthHeaders(),
       },
@@ -122,7 +121,7 @@ class AuthService {
   }
 
   async updateProfile(data: Partial<RegisterRequest>): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.USER_ME}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

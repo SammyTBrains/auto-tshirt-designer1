@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
 
 interface Transaction {
   id: string;
@@ -32,7 +33,7 @@ const Profile: React.FC = () => {
 
   const fetchTransactions = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/users/me/transactions', {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.USER_TRANSACTIONS}`, {
         headers: authService.getAuthHeaders(),
       });
       
