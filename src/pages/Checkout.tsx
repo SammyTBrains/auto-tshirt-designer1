@@ -61,13 +61,14 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
         // Create order
         const orderData: OrderCreate = {
           items: state.items.map((item) => ({
-            product_id: item.product.id,
+            product_id: String(item.product.id),
+            product_name: item.product.name,
             design_id: item.product.isCustomDesign ? item.design?.imageUrl : undefined,
             size: item.size,
             color: item.color,
             quantity: item.quantity,
             price: item.product.price,
-            custom_design: item.design
+            design_data: item.design
               ? {
                   imageUrl: item.design.imageUrl,
                   position: item.design.position,
@@ -78,6 +79,7 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
                 }
               : undefined,
           })),
+          total_amount: total,
           shipping_address: {
             full_name: formData.fullName || "Pending",
             address_line1: formData.addressLine1 || "Pending",
@@ -86,9 +88,9 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
             state: formData.state || "Pending",
             postal_code: formData.postalCode || "Pending",
             country: formData.country,
-            phone: formData.phone || "Pending",
           },
-          email: formData.email || user?.email || "guest@example.com",
+          contact_email: formData.email || user?.email || "guest@example.com",
+          contact_phone: formData.phone || undefined,
         };
 
         const order = await orderService.createOrder(orderData);

@@ -2,13 +2,14 @@ import { apiService } from './apiService';
 import { API_ENDPOINTS } from '../config/api';
 
 export interface OrderItem {
-  product_id: number;
+  product_id: string;
+  product_name: string;
   design_id?: string;
   size: string;
   color: string;
   quantity: number;
   price: number;
-  custom_design?: {
+  design_data?: {
     imageUrl: string;
     position: { x: number; y: number };
     scale: number;
@@ -20,6 +21,7 @@ export interface OrderItem {
 
 export interface OrderCreate {
   items: OrderItem[];
+  total_amount: number;
   shipping_address: {
     full_name: string;
     address_line1: string;
@@ -28,9 +30,9 @@ export interface OrderCreate {
     state: string;
     postal_code: string;
     country: string;
-    phone: string;
   };
-  email: string;
+  contact_email: string;
+  contact_phone?: string;
 }
 
 export interface Order {
