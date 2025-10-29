@@ -29,6 +29,19 @@ from email_service import email_service
 from telegram_service import telegram_service
 from database import db
 
+
+async def ensure_db_connected() -> bool:
+    """Helper to try to lazily connect to the DB when a request needs it.
+
+    Returns True if connected, False otherwise.
+    """
+    # If already connected, fast-path
+    if db.get_db() is not None:
+        return True
+    # Attempt to connect (this will retry internally)
+    await db.connect_db()
+    return db.get_db() is not None
+
 logger = logging.getLogger(__name__)
 
 # Create routers
@@ -42,50 +55,65 @@ admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
 @auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate):
     """Register a new user"""
-    if not db.get_db():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
+    try:
+        if db.get_db() is None:
+            # Try a lazy reconnect in case the startup connection failed
+            if not await ensure_db_connected():
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Database not available"
+                )
+        
+        # Check if user already exists
+        existing_user = await get_user_by_email(user.email)
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        # Create user
+        new_user = await create_user(user)
+        if not new_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create user"
+            )
+        
+        # Send welcome email (non-blocking, don't fail if email fails)
+        try:
+            await email_service.send_welcome_email(new_user.email, new_user.username)
+        except Exception as email_error:
+            logger.warning(f"Failed to send welcome email: {str(email_error)}")
+        
+        return UserResponse(
+            id=new_user.id,
+            email=new_user.email,
+            username=new_user.username,
+            full_name=new_user.full_name,
+            role=new_user.role,
+            store_credits=new_user.store_credits,
+            is_active=new_user.is_active,
+            created_at=new_user.created_at
         )
-    
-    # Check if user already exists
-    existing_user = await get_user_by_email(user.email)
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-    
-    # Create user
-    new_user = await create_user(user)
-    if not new_user:
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in register endpoint: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user"
+            detail=f"Registration failed: {str(e)}"
         )
-    
-    # Send welcome email
-    await email_service.send_welcome_email(new_user.email, new_user.username)
-    
-    return UserResponse(
-        id=new_user.id,
-        email=new_user.email,
-        username=new_user.username,
-        full_name=new_user.full_name,
-        role=new_user.role,
-        store_credits=new_user.store_credits,
-        is_active=new_user.is_active,
-        created_at=new_user.created_at
-    )
 
 @auth_router.post("/login", response_model=Token)
 async def login(login_data: LoginRequest):
     """Login and get access token"""
-    if not db.get_db():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
-        )
+    if db.get_db() is None:
+        if not await ensure_db_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not available"
+            )
     
     # Get user
     user = await get_user_by_email(login_data.email)
@@ -158,13 +186,15 @@ async def save_design(
     current_user: TokenData = Depends(get_current_user)
 ):
     """Save a new design"""
-    if not db.get_db():
-        # If database is not available, return success but don't save
-        logger.warning("Database not available, design not saved")
-        return JSONResponse(
-            content={"message": "Design created but not persisted"},
-            status_code=201
-        )
+    if db.get_db() is None:
+        # Try lazy reconnect first
+        if not await ensure_db_connected():
+            # If database is still unavailable, return success but don't save
+            logger.warning("Database not available, design not saved")
+            return JSONResponse(
+                content={"message": "Design created but not persisted"},
+                status_code=201
+            )
     
     new_design = await create_design(design, current_user.user_id)
     if not new_design:
@@ -196,11 +226,12 @@ async def create_new_order(
     current_user: Optional[TokenData] = Depends(get_current_user)
 ):
     """Create a new order"""
-    if not db.get_db():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available. Orders require database connection."
-        )
+    if db.get_db() is None:
+        if not await ensure_db_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not available. Orders require database connection."
+            )
     
     user_id = current_user.user_id if current_user else None
     
@@ -351,11 +382,12 @@ async def confirm_order_payment(
 @admin_router.get("/analytics")
 async def get_admin_analytics(current_user: TokenData = Depends(get_current_admin_user)):
     """Get analytics dashboard data"""
-    if not db.get_db():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database not available"
-        )
+    if db.get_db() is None:
+        if not await ensure_db_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not available"
+            )
     
     analytics = await get_analytics_data()
     return analytics

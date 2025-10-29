@@ -53,6 +53,7 @@ class User(UserBase):
     
     class Config:
         populate_by_name = True
+        from_attributes = True
 
 class UserInDB(User):
     pass

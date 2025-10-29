@@ -8,11 +8,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Set
 from fastapi.responses import RedirectResponse
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent / '.env'
+load_dotenv(env_path)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, Response, BackgroundTasks, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 
 # Add the parent directory to sys.path
 current_dir = Path(__file__).parent
@@ -53,12 +59,29 @@ setup_directories()
 logger = setup_logging()
 logger.info("Starting FastAPI server initialization...")
 
-# Initialize FastAPI app
+# Lifespan context manager for startup and shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize services on startup and cleanup on shutdown"""
+    # Startup
+    logger.info("Application startup - initializing services...")
+    await db.connect_db()
+    logger.info("Application startup complete")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Application shutdown - cleaning up...")
+    await db.close_db()
+    logger.info("Application shutdown complete")
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="AI T-Shirt Design API",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -98,27 +121,6 @@ design_history: list = []
 
 # Connected workers
 connected_workers: Dict[str, WebSocket] = {}
-
-# Startup and shutdown events
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup"""
-    logger.info("Application startup - initializing services...")
-    
-    # Connect to database
-    await db.connect_db()
-    
-    logger.info("Application startup complete")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("Application shutdown - cleaning up...")
-    
-    # Close database connection
-    await db.close_db()
-    
-    logger.info("Application shutdown complete")
 
 # Include API routers
 app.include_router(auth_router)

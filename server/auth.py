@@ -5,7 +5,7 @@ import os
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
-from passlib.context import CryptContext
+import bcrypt
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,9 +13,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from db_models import UserRole, TokenData
 
 logger = logging.getLogger(__name__)
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
@@ -28,14 +25,20 @@ security = HTTPBearer()
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
     except Exception as e:
         logger.error(f"Password verification error: {str(e)}")
         return False
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
-    return pwd_context.hash(password)
+    try:
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+        return hashed.decode('utf-8')
+    except Exception as e:
+        logger.error(f"Password hashing error: {str(e)}")
+        raise
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token"""

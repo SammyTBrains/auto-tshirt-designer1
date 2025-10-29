@@ -27,7 +27,7 @@ def object_id_to_str(obj: Dict[str, Any]) -> Dict[str, Any]:
 async def generate_order_number() -> str:
     """Generate a unique order number"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return f"ORD-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
     
     # Get the count of orders today
@@ -39,7 +39,7 @@ async def generate_order_number() -> str:
 async def create_user(user: UserCreate) -> Optional[User]:
     """Create a new user"""
     database = db.get_db()
-    if not database:
+    if database is None:
         logger.error("Database not connected")
         return None
     
@@ -75,7 +75,7 @@ async def create_user(user: UserCreate) -> Optional[User]:
 async def get_user_by_email(email: str) -> Optional[User]:
     """Get user by email"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -91,7 +91,7 @@ async def get_user_by_email(email: str) -> Optional[User]:
 async def get_user_by_id(user_id: str) -> Optional[User]:
     """Get user by ID"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -107,7 +107,7 @@ async def get_user_by_id(user_id: str) -> Optional[User]:
 async def update_user(user_id: str, user_update: UserUpdate) -> Optional[User]:
     """Update user information"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -131,7 +131,7 @@ async def update_user(user_id: str, user_update: UserUpdate) -> Optional[User]:
 async def update_user_credits(user_id: str, amount: int) -> bool:
     """Update user store credits"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return False
     
     try:
@@ -148,7 +148,7 @@ async def update_user_credits(user_id: str, amount: int) -> bool:
 async def create_design(design: DesignCreate, user_id: str) -> Optional[Design]:
     """Create a new design"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -175,7 +175,7 @@ async def create_design(design: DesignCreate, user_id: str) -> Optional[Design]:
 async def get_design_by_id(design_id: str) -> Optional[Design]:
     """Get design by ID"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -191,7 +191,7 @@ async def get_design_by_id(design_id: str) -> Optional[Design]:
 async def get_user_designs(user_id: str, limit: int = 50) -> List[Design]:
     """Get designs created by a user"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return []
     
     try:
@@ -208,7 +208,7 @@ async def get_user_designs(user_id: str, limit: int = 50) -> List[Design]:
 async def increment_design_purchases(design_id: str) -> bool:
     """Increment design purchase count"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return False
     
     try:
@@ -225,7 +225,7 @@ async def increment_design_purchases(design_id: str) -> bool:
 async def create_order(order: OrderCreate, user_id: Optional[str] = None) -> Optional[Order]:
     """Create a new order"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -251,7 +251,7 @@ async def create_order(order: OrderCreate, user_id: Optional[str] = None) -> Opt
 async def get_order_by_id(order_id: str) -> Optional[Order]:
     """Get order by ID"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -267,7 +267,7 @@ async def get_order_by_id(order_id: str) -> Optional[Order]:
 async def get_user_orders(user_id: str, limit: int = 50) -> List[Order]:
     """Get orders for a user"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return []
     
     try:
@@ -284,7 +284,7 @@ async def get_user_orders(user_id: str, limit: int = 50) -> List[Order]:
 async def update_order_status(order_id: str, status: OrderStatus, **kwargs) -> Optional[Order]:
     """Update order status"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -316,7 +316,7 @@ async def update_order_status(order_id: str, status: OrderStatus, **kwargs) -> O
 async def create_transaction(transaction: TransactionCreate) -> Optional[Transaction]:
     """Create a transaction record"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return None
     
     try:
@@ -348,7 +348,7 @@ async def create_transaction(transaction: TransactionCreate) -> Optional[Transac
 async def get_user_transactions(user_id: str, limit: int = 50) -> List[Transaction]:
     """Get transactions for a user"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return []
     
     try:
@@ -366,7 +366,7 @@ async def get_user_transactions(user_id: str, limit: int = 50) -> List[Transacti
 async def get_analytics_data(period: str = "daily") -> Dict[str, Any]:
     """Get analytics data"""
     database = db.get_db()
-    if not database:
+    if database is None:
         return {}
     
     try:
