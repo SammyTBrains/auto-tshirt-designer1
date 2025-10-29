@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 
 # Re-export existing models
-from models import TaskStatus, DesignRequest, Task
+from server.models import TaskStatus, DesignRequest, Task
 
 class UserRole(str, Enum):
     USER = "user"

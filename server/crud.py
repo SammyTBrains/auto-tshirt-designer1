@@ -6,14 +6,14 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from bson import ObjectId
 
-from database import db
-from db_models import (
+from server.database import db
+from server.db_models import (
     User, UserCreate, UserUpdate, UserRole,
     Design, DesignCreate,
     Order, OrderCreate, OrderStatus,
     Transaction, TransactionCreate, TransactionType
 )
-from auth import get_password_hash
+from server.auth import get_password_hash
 
 logger = logging.getLogger(__name__)
 

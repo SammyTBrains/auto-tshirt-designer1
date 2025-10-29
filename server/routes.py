@@ -6,28 +6,28 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.responses import JSONResponse
 
-from db_models import (
+from server.db_models import (
     UserCreate, UserResponse, UserUpdate, LoginRequest, Token,
     DesignCreate, Design,
     OrderCreate, Order, OrderStatus,
     TransactionCreate, Transaction, TransactionType,
     TokenData
 )
-from auth import (
+from server.auth import (
     get_current_user, get_current_user_optional, get_current_admin_user,
     verify_password, create_access_token
 )
-from crud import (
+from server.crud import (
     create_user, get_user_by_email, get_user_by_id, update_user,
     create_design, get_design_by_id, get_user_designs, increment_design_purchases,
     create_order, get_order_by_id, get_user_orders, update_order_status,
     create_transaction, get_user_transactions,
     get_analytics_data
 )
-from payment_service import payment_service
-from email_service import email_service
-from telegram_service import telegram_service
-from database import db
+from server.payment_service import payment_service
+from server.email_service import email_service
+from server.telegram_service import telegram_service
+from server.database import db
 
 
 async def ensure_db_connected() -> bool:
@@ -302,13 +302,13 @@ async def checkout_order(
         order_id,
         OrderStatus.PROCESSING,
         payment_intent_id=payment_intent["payment_intent_id"]
-        # Notify admin that payment intent is created (customer is about to pay)
-        await telegram_service.notify_payment_intent(
-            order.order_number,
-            order.total_amount,
-            len(order.items)
-        )
-    
+    )
+
+    # Notify admin that payment intent is created (customer is about to pay)
+    await telegram_service.notify_payment_intent(
+        order.order_number,
+        order.total_amount,
+        len(order.items)
     )
     
     return payment_intent
@@ -326,13 +326,15 @@ async def confirm_order_payment(
     if not order.payment_intent_id:
         raise HTTPException(status_code=400, detail="No payment intent found")
     
-    # Verify payment with Stripe
-    payment_confirmed = await payment_service.confirm_payment(order.payment_intent_id)
+    # Verify payment with Stripe (tolerate short processing window)
+    payment_confirmed = await payment_service.confirm_payment(order.payment_intent_id, wait_seconds=8.0)
     
     if not payment_confirmed:
+        # Include current status for easier troubleshooting
+        current_status = await payment_service.get_payment_status(order.payment_intent_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Payment not confirmed"
+            detail=f"Payment not confirmed (status: {current_status})"
         )
     
     # Update order status
@@ -451,7 +453,7 @@ async def test_telegram_notification(current_user: TokenData = Depends(get_curre
             detail="Telegram not configured"
         )
     
-    success = await telegram_service.send_message("🧪 <b>Test notification from T-Shirt Designer</b>")
+    success = await telegram_service.send_message("<b>Test notification from T-Shirt Designer</b>")
     return {"success": success}
 
 @admin_router.post("/analytics/send-daily-report")

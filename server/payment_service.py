@@ -3,10 +3,11 @@ Stripe payment integration service
 """
 import os
 import logging
+import asyncio
 from typing import Optional, Dict, Any
 import stripe
 
-from db_models import Order, OrderStatus
+from server.db_models import Order, OrderStatus
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +77,13 @@ class PaymentService:
             return None
     
     @staticmethod
-    async def confirm_payment(payment_intent_id: str) -> bool:
+    async def confirm_payment(payment_intent_id: str, wait_seconds: float = 6.0) -> bool:
         """
         Confirm a payment was successful
         
         Args:
             payment_intent_id: Stripe payment intent ID
+            wait_seconds: How long to poll for success if the payment is still processing
         
         Returns:
             True if payment succeeded, False otherwise
@@ -91,10 +93,34 @@ class PaymentService:
             return False
         
         try:
-            payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-            
-            return payment_intent.status == "succeeded"
-        
+            deadline = asyncio.get_event_loop().time() + max(0.5, wait_seconds)
+            last_status = None
+            while True:
+                payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+                status = getattr(payment_intent, "status", None)
+                last_status = status
+                logger.info(f"Stripe payment_intent {payment_intent_id} status: {status}")
+
+                if status == "succeeded":
+                    return True
+                if status in {"canceled", "requires_payment_method"}:
+                    return False
+                # For statuses that may complete shortly, poll briefly
+                if status in {"processing", "requires_capture", "requires_action"}:
+                    if asyncio.get_event_loop().time() < deadline:
+                        await asyncio.sleep(0.5)
+                        continue
+                    else:
+                        logger.warning(
+                            f"Payment intent {payment_intent_id} still {status} after polling; treating as failure"
+                        )
+                        return False
+                # Unknown status; poll a bit and then give up
+                if asyncio.get_event_loop().time() < deadline:
+                    await asyncio.sleep(0.5)
+                    continue
+                return False
+
         except stripe.error.StripeError as e:
             logger.error(f"Stripe error: {str(e)}")
             return False

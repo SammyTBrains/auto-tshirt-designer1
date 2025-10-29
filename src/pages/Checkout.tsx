@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import { loadStripe } from "@stripe/stripe-js";
@@ -32,6 +32,7 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const initializedRef = useRef(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -51,10 +52,16 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
 
   // Create order and payment intent on mount
   useEffect(() => {
+    if (initializedRef.current) {
+      return;
+    }
+
     if (state.items.length === 0) {
       navigate("/cart");
       return;
     }
+
+    initializedRef.current = true;
 
     const initializeCheckout = async () => {
       try {
@@ -112,7 +119,7 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
     };
 
     initializeCheckout();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [navigate, state.items.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -10,7 +10,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from db_models import UserRole, TokenData
+from server.db_models import UserRole, TokenData
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password"""
     try:
-        salt = bcrypt.gensalt()
+        # Use rounds=4 for much faster hashing (default is 12, which is VERY slow)
+        # 4 rounds is still secure for development; increase to 10-12 for production
+        salt = bcrypt.gensalt(rounds=4)
         hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
         return hashed.decode('utf-8')
     except Exception as e:
