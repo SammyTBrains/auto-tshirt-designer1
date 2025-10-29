@@ -20,6 +20,7 @@ multidict>=4.5.0   # Required by aiohttp
 yarl>=1.17.0     # Required by aiohttp
 websockets>=12.0.3
 tqdm>=4.66.1
+huggingface_hub>=0.25.0
 opencv-python-headless>=4.9.0.80
 scikit-image>=0.22.0
 imageio>=2.33.1

@@ -1,4 +1,4 @@
-import { Product } from './product';
+import { Product } from "./product";
 
 export interface DesignData {
   imageUrl: string;
@@ -8,6 +8,14 @@ export interface DesignData {
   };
   scale: number;
   rotation: number;
+  canvasSize: {
+    width: number;
+    height: number;
+  };
+  baseSize: {
+    width: number;
+    height: number;
+  };
 }
 
 export interface CartItem {

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
-import { Trash2, Plus, Minus, ArrowRight } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import React, { useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
+import { Trash2, Plus, Minus, ArrowRight } from "lucide-react";
+import { useCart } from "../context/CartContext";
 
 function Cart() {
   const { state, dispatch } = useCart();
@@ -10,17 +10,21 @@ function Cart() {
 
   const updateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { productId, quantity: newQuantity } });
+    dispatch({
+      type: "UPDATE_QUANTITY",
+      payload: { productId, quantity: newQuantity },
+    });
   };
 
   const removeItem = (productId: number) => {
-    dispatch({ type: 'REMOVE_FROM_CART', payload: productId });
+    dispatch({ type: "REMOVE_FROM_CART", payload: productId });
   };
 
   // Helper function to get color adjusted t-shirt image
   const getColorAdjustedImage = (color: string) => {
     const hex = color.toUpperCase().replace("#", "");
-    const baseUrl = "https://res.cloudinary.com/demo-robert/image/upload/w_700/e_replace_color:FFFFFF:60:white/l_hanging-shirt-texture,o_0,fl_relative,w_1.0/l_Hanger_qa2diz,fl_relative,w_1.0/Hanging_T-Shirt_v83je9.jpg";
+    const baseUrl =
+      "https://res.cloudinary.com/demo-robert/image/upload/w_700/e_replace_color:FFFFFF:60:white/l_hanging-shirt-texture,o_0,fl_relative,w_1.0/l_Hanger_qa2diz,fl_relative,w_1.0/Hanging_T-Shirt_v83je9.jpg";
     return baseUrl.replace(
       /e_replace_color:FFFFFF:60:white/,
       `e_replace_color:${hex}:60:white`
@@ -60,94 +64,146 @@ function Cart() {
         <div className="grid md:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="md:col-span-2">
-            {state.items.map((item) => (
-              <div
-                key={`${item.product.id}-${item.size}-${item.color}`}
-                className="flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm mb-4"
-              >
-                {/* Product Preview */}
-                <div className="relative w-32 h-32 flex-shrink-0">
-                  {item.product.isCustomDesign && item.design ? (
-                    // Custom design with t-shirt and design overlay
-                    <div className="relative w-full h-full">
-                      {/* T-shirt background */}
-                      <img
-                        src={getColorAdjustedImage(item.color)}
-                        alt="T-Shirt"
-                        className="w-full h-full object-contain"
-                      />
-                      {/* Design overlay */}
-                      <div
-                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                        style={{
-                          transform: `translate(${item.design.position.x * 0.1}px, ${item.design.position.y * 0.1}px)`,
-                        }}
-                      >
-                        <img
-                          src={item.design.imageUrl}
-                          alt="Design"
-                          className="max-w-[60%] max-h-[60%] object-contain"
-                          style={{
-                            transform: `scale(${item.design.scale * 0.8}) rotate(${item.design.rotation}deg)`,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    // Regular product image
-                    <img
-                      src={item.product.image}
-                      alt={item.product.name}
-                      className="w-full h-full object-cover rounded"
-                    />
-                  )}
-                </div>
+            {state.items.map((item) => {
+              const hasCustomDesign =
+                item.product.isCustomDesign && item.design;
+              let overlayStyle: React.CSSProperties | undefined;
+              let imageStyle: React.CSSProperties | undefined;
 
-                {/* Product Details */}
-                <div className="flex-grow">
-                  <h3 className="font-semibold">{item.product.name}</h3>
-                  <p className="text-sm text-gray-600">
-                    Size: {item.size}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Color: 
-                    <span 
-                      className="inline-block w-4 h-4 ml-2 rounded border border-gray-300"
-                      style={{ backgroundColor: item.color }}
-                    />
-                  </p>
-                  {item.product.isCustomDesign && (
-                    <p className="text-xs text-blue-600 mt-1">Custom AI Design</p>
-                  )}
-                  <div className="flex items-center mt-2">
+              if (hasCustomDesign) {
+                const design = item.design!;
+                const canvasWidth = design.canvasSize?.width ?? 0;
+                const canvasHeight = design.canvasSize?.height ?? 0;
+                const baseWidth = design.baseSize?.width ?? 0;
+                const baseHeight = design.baseSize?.height ?? 0;
+                const hasDimensionData =
+                  canvasWidth > 0 &&
+                  canvasHeight > 0 &&
+                  baseWidth > 0 &&
+                  baseHeight > 0;
+
+                if (hasDimensionData) {
+                  const positionXPercent =
+                    (design.position.x / canvasWidth) * 100;
+                  const positionYPercent =
+                    (design.position.y / canvasHeight) * 100;
+                  const widthPercent =
+                    ((baseWidth * design.scale) / canvasWidth) * 100;
+
+                  overlayStyle = {
+                    left: `${positionXPercent}%`,
+                    top: `${positionYPercent}%`,
+                    width: `${widthPercent}%`,
+                    transform: `translate(-50%, -50%) rotate(${design.rotation}deg)`,
+                  };
+                  imageStyle = {
+                    width: "100%",
+                    height: "auto",
+                  };
+                } else {
+                  overlayStyle = {
+                    left: "50%",
+                    top: "50%",
+                    transform: `translate(-50%, -50%) scale(${design.scale}) rotate(${design.rotation}deg)`,
+                  };
+                  imageStyle = {
+                    width: "60%",
+                    height: "auto",
+                  };
+                }
+              }
+
+              return (
+                <div
+                  key={`${item.product.id}-${item.size}-${item.color}`}
+                  className="flex items-start gap-4 p-4 bg-white rounded-lg shadow-sm mb-4"
+                >
+                  {/* Product Preview */}
+                  <div className="relative w-32 h-32 flex-shrink-0">
+                    {hasCustomDesign ? (
+                      <div className="relative w-full h-full">
+                        <img
+                          src={getColorAdjustedImage(item.color)}
+                          alt="T-Shirt"
+                          className="w-full h-full object-contain"
+                        />
+                        {overlayStyle && imageStyle && (
+                          <div className="absolute inset-0 pointer-events-none">
+                            <div
+                              className="absolute origin-center"
+                              style={overlayStyle}
+                            >
+                              <img
+                                src={item.design!.imageUrl}
+                                alt="Design"
+                                style={imageStyle}
+                                className="object-contain"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <img
+                        src={item.product.image}
+                        alt={item.product.name}
+                        className="w-full h-full object-cover rounded"
+                      />
+                    )}
+                  </div>
+
+                  {/* Product Details */}
+                  <div className="flex-grow">
+                    <h3 className="font-semibold">{item.product.name}</h3>
+                    <p className="text-sm text-gray-600">Size: {item.size}</p>
+                    <p className="text-sm text-gray-600">
+                      Color:
+                      <span
+                        className="inline-block w-4 h-4 ml-2 rounded border border-gray-300"
+                        style={{ backgroundColor: item.color }}
+                      />
+                    </p>
+                    {item.product.isCustomDesign && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Custom AI Design
+                      </p>
+                    )}
+                    <div className="flex items-center mt-2">
+                      <button
+                        onClick={() =>
+                          updateQuantity(item.product.id, item.quantity - 1)
+                        }
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </button>
+                      <span className="mx-3">{item.quantity}</span>
+                      <button
+                        onClick={() =>
+                          updateQuantity(item.product.id, item.quantity + 1)
+                        }
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Price and Remove */}
+                  <div className="text-right">
+                    <p className="font-semibold">
+                      ${(item.product.price * item.quantity).toFixed(2)}
+                    </p>
                     <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity - 1)}
-                      className="p-1 hover:bg-gray-100 rounded"
+                      onClick={() => removeItem(item.product.id)}
+                      className="text-red-600 hover:text-red-700 mt-2"
                     >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="mx-3">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity + 1)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <Plus className="h-4 w-4" />
+                      <Trash2 className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
-
-                {/* Price and Remove */}
-                <div className="text-right">
-                  <p className="font-semibold">${(item.product.price * item.quantity).toFixed(2)}</p>
-                  <button
-                    onClick={() => removeItem(item.product.id)}
-                    className="text-red-600 hover:text-red-700 mt-2"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Order Summary */}
@@ -160,12 +216,14 @@ function Cart() {
               </div>
               <div className="flex justify-between">
                 <span>Shipping</span>
-                <span>{state.total > 50 ? 'Free' : '$4.99'}</span>
+                <span>{state.total > 50 ? "Free" : "$4.99"}</span>
               </div>
               <div className="border-t pt-3">
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>${(state.total + (state.total > 50 ? 0 : 4.99)).toFixed(2)}</span>
+                  <span>
+                    ${(state.total + (state.total > 50 ? 0 : 4.99)).toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>

@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 import uuid
-from typing import Optional, Dict, List, Tuple, Any
+from typing import Optional, Dict, List, Tuple, Any, Set
 import aiohttp
 import asyncio
 import os
@@ -13,6 +13,12 @@ from server.utils import serialize_datetime
 from PIL import Image
 import io
 import time
+from dotenv import load_dotenv
+
+try:
+    from huggingface_hub import InferenceClient  # type: ignore
+except ImportError:  # pragma: no cover - library is optional at runtime
+    InferenceClient = None
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +30,74 @@ class TaskQueue:
         self.completed_tasks = {}  # type: Dict[str, dict]
         self.failed_tasks = set()  # type: Set[str]
         self.task_timeout = 300  # 5 minutes
-        self.api_url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-3.5-large"
-        self.api_headers = {"Authorization": "Bearer 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"}
-        self.api_timeout = 120  # 2 minutes for API requests
+        # Load environment variables from server/.env so local runs pick up the token
+        env_path = Path(__file__).parent / ".env"
+        load_dotenv(dotenv_path=env_path, override=False)
+
+        default_model = "stabilityai/stable-diffusion-3.5-large"
+        default_base_url = "https://router.huggingface.co/hf-inference/models"
+        configured_base = os.getenv("HUGGINGFACE_API_BASE", default_base_url).rstrip("/")
+        configured_model = os.getenv("HUGGINGFACE_MODEL", default_model).strip()
+        self.api_url = f"{configured_base}/{configured_model}" if configured_model else f"{configured_base}/{default_model}"
+        try:
+            self.api_timeout = float(os.getenv("HUGGINGFACE_TIMEOUT", "120"))
+        except ValueError:
+            self.api_timeout = 120.0
+
+        hf_token = os.getenv("HUGGINGFACE_TOKEN", "").strip()
+        self.api_headers: Dict[str, str] = {"Accept": "image/png"}
+        if not hf_token:
+            logger.warning("HUGGINGFACE_TOKEN missing; API generation will fail until it is set.")
+        else:
+            logger.info("Hugging Face token detected (masked).")
+            self.api_headers["Authorization"] = f"Bearer {hf_token}"
+
+        self.hf_model = configured_model or default_model
+        provider_raw = os.getenv("HUGGINGFACE_PROVIDER", "").strip()
+        self.hf_provider: Optional[str] = None
+        self.provider_config: Optional[Dict[str, Any]] = None
+
+        if provider_raw:
+            lowered = provider_raw.lower()
+            if lowered not in {"auto", "default"}:
+                if provider_raw.startswith("{"):
+                    try:
+                        parsed = json.loads(provider_raw)
+                        if isinstance(parsed, dict):
+                            self.provider_config = parsed
+                            vendor = parsed.get("vendor")
+                            if isinstance(vendor, str) and vendor:
+                                self.hf_provider = vendor
+                        else:
+                            logger.warning(
+                                "HUGGINGFACE_PROVIDER JSON must decode to an object. Ignoring value: %s",
+                                provider_raw,
+                            )
+                    except json.JSONDecodeError as exc:
+                        logger.warning("Failed to parse HUGGINGFACE_PROVIDER JSON: %s", exc)
+                else:
+                    self.hf_provider = provider_raw
+                    self.provider_config = {"vendor": provider_raw}
+
+        if self.provider_config:
+            logger.info("Using custom provider configuration: %s", self.provider_config)
+
+        self.inference_client = None
+        if hf_token and InferenceClient:
+            client_kwargs: Dict[str, Any] = {
+                "model": self.hf_model,
+                "token": hf_token,
+                "timeout": self.api_timeout,
+            }
+            if self.hf_provider:
+                client_kwargs["provider"] = self.hf_provider
+            try:
+                self.inference_client = InferenceClient(**client_kwargs)
+                logger.info("Initialized Hugging Face InferenceClient for model %s", self.hf_model)
+            except Exception as exc:
+                logger.warning("Failed to initialize InferenceClient: %s", exc)
+        elif hf_token and not InferenceClient:
+            logger.warning("huggingface_hub not installed; falling back to raw HTTP requests.")
         
         # Get root directory and set up outputs directory
         self.root_dir = Path(__file__).parent.parent.resolve()
@@ -73,23 +144,53 @@ class TaskQueue:
         if not prompt:
             return None
 
-        payload = {
+        if self.inference_client:
+            try:
+                def generate_image() -> bytes:
+                    image = self.inference_client.text_to_image(
+                        prompt=prompt,
+                        negative_prompt="blurry, distorted, low quality",
+                        guidance_scale=7.5,
+                        num_inference_steps=30,
+                        width=1024,
+                        height=1024,
+                        extra_body={"output_format": "png"},
+                    )
+                    buffer = io.BytesIO()
+                    image.save(buffer, format="PNG")
+                    return buffer.getvalue()
+
+                return await asyncio.to_thread(generate_image)
+            except Exception as exc:
+                logger.warning("InferenceClient text_to_image failed: %s", exc)
+
+        payload: Dict[str, Any] = {
             "inputs": prompt,
             "parameters": {
                 "guidance_scale": 7.5,
                 "negative_prompt": "blurry, distorted, low quality",
                 "num_inference_steps": 30,
                 "width": 1024,
-                "height": 1024
-            }
+                "height": 1024,
+            },
         }
+        if self.provider_config:
+            payload["provider"] = self.provider_config
 
         timeout = aiohttp.ClientTimeout(total=self.api_timeout)
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(self.api_url, headers=self.api_headers, json=payload) as response:
                     if response.status != 200:
-                        logger.warning(f"API request failed with status {response.status}")
+                        try:
+                            error_preview = await response.text()
+                        except Exception:
+                            error_preview = "<no response body>"
+                        logger.warning(
+                            "API request failed with status %s: %s",
+                            response.status,
+                            error_preview[:500]
+                        )
                         return None
                     
                     data = await response.content.read()

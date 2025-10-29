@@ -46,6 +46,12 @@ const CustomDesign: React.FC = () => {
   const [crop, setCrop] = useState<PercentCrop>();
   const [isPickingDesignColor, setIsPickingDesignColor] = useState(false);
   const [designHistory, setDesignHistory] = useState<string[]>([]);
+  const designCanvasRef = useRef<HTMLDivElement>(null);
+  const [designCanvasSize, setDesignCanvasSize] = useState({
+    width: 0,
+    height: 0,
+  });
+  const [designBaseSize, setDesignBaseSize] = useState({ width: 0, height: 0 });
 
   const tshirtViews = {
     hanging:
@@ -100,6 +106,21 @@ const CustomDesign: React.FC = () => {
     loadHistory();
   }, []);
 
+  useEffect(() => {
+    const updateCanvasSize = () => {
+      if (designCanvasRef.current) {
+        const rect = designCanvasRef.current.getBoundingClientRect();
+        setDesignCanvasSize({ width: rect.width, height: rect.height });
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener("resize", updateCanvasSize);
+    return () => {
+      window.removeEventListener("resize", updateCanvasSize);
+    };
+  }, [designTexture]);
+
   const handleRetry = () => {
     if (designTexture) {
       setDesignTexture(null);
@@ -128,6 +149,13 @@ const CustomDesign: React.FC = () => {
         URL.revokeObjectURL(currentObjectUrl.current);
       }
       setDesignTexture(design);
+      const defaultCenter =
+        designCanvasSize.width && designCanvasSize.height
+          ? {
+              x: designCanvasSize.width / 2,
+              y: designCanvasSize.height / 2,
+            }
+          : { x: 300, y: 300 };
       // Keep the current position if it exists, otherwise use initial position
       setDesignTransform((prev) => ({
         ...prev,
@@ -137,7 +165,7 @@ const CustomDesign: React.FC = () => {
         position:
           prev.position.x !== 0 && prev.position.y !== 0
             ? prev.position
-            : { x: 300, y: 300 }, // Default center position
+            : defaultCenter, // Default center position
         rotation: 0,
         scale: 1,
       }));
@@ -153,15 +181,19 @@ const CustomDesign: React.FC = () => {
   };
 
   const handleReset = () => {
-    if (designTexture && containerRef.current) {
+    if (designTexture) {
+      const centerX = designCanvasSize.width ? designCanvasSize.width / 2 : 300;
+      const centerY = designCanvasSize.height
+        ? designCanvasSize.height / 2
+        : 300;
       setDesignTransform((prev) => ({
         ...prev,
         texture: designTexture,
         rotation: 0,
         scale: 1,
         position: {
-          x: 300,
-          y: 300,
+          x: centerX,
+          y: centerY,
         },
       }));
 
@@ -206,12 +238,24 @@ const CustomDesign: React.FC = () => {
     }
   };
 
+  const resolveCanvasDimensions = () => {
+    const canvasRect = designCanvasRef.current?.getBoundingClientRect();
+    const width = canvasRect?.width ?? (designCanvasSize.width || 600);
+    const height = canvasRect?.height ?? (designCanvasSize.height || 600);
+    return { width, height };
+  };
+
   const handleAddToCart = () => {
     if (!designTexture) {
       setError("Please create a design first");
       return;
     }
-    
+
+    const { width: resolvedCanvasWidth, height: resolvedCanvasHeight } =
+      resolveCanvasDimensions();
+    const resolvedBaseWidth = designBaseSize.width || 200;
+    const resolvedBaseHeight = designBaseSize.height || 200;
+
     // Create a custom product for the cart
     const customProduct = {
       id: Date.now(), // Unique ID based on timestamp
@@ -227,7 +271,7 @@ const CustomDesign: React.FC = () => {
       tags: ["custom", "ai-generated"],
       isCustomDesign: true,
     };
-    
+
     const cartItem = {
       product: customProduct,
       quantity: 1,
@@ -238,12 +282,20 @@ const CustomDesign: React.FC = () => {
         position: designTransform.position,
         scale: designTransform.scale,
         rotation: designTransform.rotation,
+        canvasSize: {
+          width: resolvedCanvasWidth,
+          height: resolvedCanvasHeight,
+        },
+        baseSize: {
+          width: resolvedBaseWidth,
+          height: resolvedBaseHeight,
+        },
       },
     };
-    
+
     // Add to cart
     dispatch({ type: "ADD_TO_CART", payload: cartItem });
-    
+
     // Show success message and navigate to cart
     alert("Added to cart successfully!");
     navigate("/cart");
@@ -262,7 +314,17 @@ const CustomDesign: React.FC = () => {
       }
       return prev;
     });
-    setDesignTransform(DesignService.getInitialDesignTransform());
+    const { width, height } = resolveCanvasDimensions();
+    setDesignTransform({
+      hasBackground: true,
+      texture: designUrl,
+      rotation: 0,
+      scale: 1,
+      position: {
+        x: width / 2,
+        y: height / 2,
+      },
+    });
   };
 
   const handleGenerate = async (prompt: string) => {
@@ -423,8 +485,6 @@ const CustomDesign: React.FC = () => {
     }));
   };
 
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const handleCropClick = () => {
     setIsCropping((prev) => !prev);
     // Only reset crop when exiting crop mode
@@ -442,9 +502,12 @@ const CustomDesign: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <div className="bg-white rounded-lg shadow-lg p-6 transition-all duration-300 hover:shadow-xl">
           {/* Main Design Area */}
-          <div className="relative" ref={containerRef}>
+          <div className="relative">
             {/* Design Display */}
-            <div className="relative w-full h-[600px] bg-gray-100 rounded-lg transition-all duration-300">
+            <div
+              ref={designCanvasRef}
+              className="relative w-full h-[600px] bg-gray-100 rounded-lg transition-all duration-300"
+            >
               {/* T-shirt layer */}
               <div className="absolute inset-0 flex items-center justify-center">
                 <img
@@ -469,6 +532,13 @@ const CustomDesign: React.FC = () => {
                   isPickingDesignColor={isPickingDesignColor}
                   setIsPickingDesignColor={setIsPickingDesignColor}
                   onDesignColorChange={handleColorPick}
+                  onDesignSizeChange={(size) =>
+                    setDesignBaseSize((prev) =>
+                      prev.width === size.width && prev.height === size.height
+                        ? prev
+                        : size
+                    )
+                  }
                 />
               )}
             </div>
