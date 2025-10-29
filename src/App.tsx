@@ -32,6 +32,7 @@ const Register = React.lazy(() => import("./pages/Register"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const AdminDashboard = React.lazy(() => import("./pages/AdminDashboard"));
 const AdminUsers = React.lazy(() => import("./pages/AdminUsers"));
+const Checkout = React.lazy(() => import("./pages/Checkout"));
 
 // Loading component for suspense fallback
 const LoadingSpinner = () => (
@@ -100,6 +101,7 @@ function App() {
                       <Route path="/shop" element={<Shop />} />
                       <Route path="/product/:id" element={<ProductDetail />} />
                       <Route path="/cart" element={<Cart />} />
+                      <Route path="/checkout" element={<Checkout />} />
                       <Route path="/blog" element={<Blog />} />
                       <Route path="/about" element={<About />} />
                       <Route path="/legal" element={<Legal />} />

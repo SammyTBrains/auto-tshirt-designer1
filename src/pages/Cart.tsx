@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Trash2, Plus, Minus, ArrowRight } from "lucide-react";
 import { useCart } from "../context/CartContext";
 
 function Cart() {
   const { state, dispatch } = useCart();
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const navigate = useNavigate();
 
   const updateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
@@ -228,7 +228,7 @@ function Cart() {
               </div>
             </div>
             <button
-              onClick={() => setIsCheckingOut(true)}
+              onClick={() => navigate("/checkout")}
               className="w-full bg-indigo-600 text-white py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-indigo-700"
             >
               <span>Proceed to Checkout</span>
