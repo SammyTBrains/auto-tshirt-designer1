@@ -243,12 +243,7 @@ async def create_new_order(
             detail="Failed to create order"
         )
     
-    # Send Telegram notification
-    await telegram_service.notify_new_order(
-        new_order.order_number,
-        new_order.total_amount,
-        len(new_order.items)
-    )
+    # Don't send notification yet - wait until payment is confirmed
     
     return new_order
 
@@ -370,10 +365,11 @@ async def confirm_order_payment(
         order.total_amount
     )
     
-    # Send Telegram notification
-    await telegram_service.notify_payment_received(
+    # Send Telegram notification about successful payment
+    await telegram_service.notify_new_order(
         order.order_number,
-        order.total_amount
+        order.total_amount,
+        len(order.items)
     )
     
     return {"status": "success", "order": updated_order}
