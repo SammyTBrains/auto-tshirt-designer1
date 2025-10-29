@@ -1,6 +1,7 @@
 // CustomDesign.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { Helmet } from "react-helmet-async";
+import { useNavigate } from "react-router-dom";
 import {
   Crop,
   AlertCircle,
@@ -17,10 +18,13 @@ import { PromptInput } from "../../components/TShirtCustomizer/PromptInput";
 import { DesignService } from "../../services/designService";
 import { DesignTransform } from "./types";
 import { DraggableDesign } from "../../components/DraggableDesign/DraggableDesign";
+import { useCart } from "../../context/CartContext";
 import type { PercentCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 
 const CustomDesign: React.FC = () => {
+  const navigate = useNavigate();
+  const { dispatch } = useCart();
   const [tShirtColor, setTShirtColor] = useState("#ffffff");
   const [designColor, setDesignColor] = useState<string>("#000000");
   const [colorIntensity, setColorIntensity] = useState(0);
@@ -207,14 +211,42 @@ const CustomDesign: React.FC = () => {
       setError("Please create a design first");
       return;
     }
-    const cartItem = {
-      design: designTexture,
-      color: tShirtColor,
-      size: size,
-      timestamp: new Date().toISOString(),
+    
+    // Create a custom product for the cart
+    const customProduct = {
+      id: Date.now(), // Unique ID based on timestamp
+      name: "Custom AI-Generated T-Shirt",
+      price: 29.99,
+      rating: 5,
+      reviews: 0,
+      image: designTexture,
+      description: "Your custom AI-generated design",
+      sizes: ["XS", "S", "M", "L", "XL", "XXL"],
+      colors: ["#ffffff", "#000000", "#ff0000", "#00ff00", "#0000ff"],
+      category: "custom",
+      tags: ["custom", "ai-generated"],
+      isCustomDesign: true,
     };
-    console.log("Adding to cart:", cartItem);
+    
+    const cartItem = {
+      product: customProduct,
+      quantity: 1,
+      size: size,
+      color: tShirtColor,
+      design: {
+        imageUrl: designTexture,
+        position: designTransform.position,
+        scale: designTransform.scale,
+        rotation: designTransform.rotation,
+      },
+    };
+    
+    // Add to cart
+    dispatch({ type: "ADD_TO_CART", payload: cartItem });
+    
+    // Show success message and navigate to cart
     alert("Added to cart successfully!");
+    navigate("/cart");
   };
 
   const handleSuccessfulGeneration = async (designUrl: string) => {

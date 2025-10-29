@@ -11,4 +11,5 @@ export interface Product {
   category: string;
   tags: string[];
   featured?: boolean;
+  isCustomDesign?: boolean;
 }
