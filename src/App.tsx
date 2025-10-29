@@ -31,6 +31,7 @@ const Login = React.lazy(() => import("./pages/Login"));
 const Register = React.lazy(() => import("./pages/Register"));
 const Profile = React.lazy(() => import("./pages/Profile"));
 const AdminDashboard = React.lazy(() => import("./pages/AdminDashboard"));
+const AdminUsers = React.lazy(() => import("./pages/AdminUsers"));
 
 // Loading component for suspense fallback
 const LoadingSpinner = () => (
@@ -117,6 +118,7 @@ function App() {
                       <Route path="/register" element={<Register />} />
                       <Route path="/profile" element={<Profile />} />
                       <Route path="/admin" element={<AdminDashboard />} />
+                      <Route path="/admin/users" element={<AdminUsers />} />
                       {/* Catch all route for 404 */}
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>

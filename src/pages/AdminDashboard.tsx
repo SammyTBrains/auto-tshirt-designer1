@@ -34,6 +34,7 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
+  const USER_LIST_LIMIT = 10;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [telegramSuccess, setTelegramSuccess] = useState("");
@@ -304,7 +305,7 @@ const AdminDashboard: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    users.slice(0, 10).map((u) => (
+                    users.slice(0, USER_LIST_LIMIT).map((u) => (
                       <tr key={u._id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">
                           {u.full_name || u.username}
@@ -332,6 +333,17 @@ const AdminDashboard: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {/* View all button */}
+            {users.length > USER_LIST_LIMIT && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => navigate("/admin/users")}
+                  className="px-4 py-2 rounded-md bg-white border border-gray-300 text-sm font-medium hover:bg-gray-50"
+                >
+                  View all users
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

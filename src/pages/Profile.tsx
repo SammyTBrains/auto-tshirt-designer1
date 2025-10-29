@@ -86,7 +86,8 @@ const Profile: React.FC = () => {
           <h1 className="text-3xl font-extrabold text-gray-900">My Profile</h1>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
-              Member since {new Date(user.created_at || Date.now()).toLocaleDateString()}
+              Member since{" "}
+              {new Date(user.created_at || Date.now()).toLocaleDateString()}
             </div>
             {!editing && (
               <button
@@ -116,18 +117,26 @@ const Profile: React.FC = () => {
                 <h3 className="mt-4 text-xl font-bold text-gray-900 text-center">
                   {user.full_name || user.username}
                 </h3>
-                <p className="text-sm text-gray-500 text-center break-all">{user.email}</p>
+                <p className="text-sm text-gray-500 text-center break-all">
+                  {user.email}
+                </p>
                 <div className="mt-4 w-full grid grid-cols-3 gap-3 border-t pt-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{user.store_credits}</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {user.store_credits}
+                    </div>
                     <div className="text-xs text-gray-500">Credits</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-900">{(user as any).design_count ?? 0}</div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {(user as any).design_count ?? 0}
+                    </div>
                     <div className="text-xs text-gray-500">Designs</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-sm font-semibold text-gray-900 capitalize pt-1">{user.role}</div>
+                    <div className="text-sm font-semibold text-gray-900 capitalize pt-1">
+                      {user.role}
+                    </div>
                     <div className="text-xs text-gray-500">Role</div>
                   </div>
                 </div>
