@@ -68,7 +68,9 @@ const AdminUsers: React.FC = () => {
 
         <div className="bg-white shadow rounded-lg p-4">
           {loading ? (
-            <div className="py-8 text-center text-gray-500">Loading users...</div>
+            <div className="py-8 text-center text-gray-500">
+              Loading users...
+            </div>
           ) : users.length === 0 ? (
             <div className="py-8 text-center text-gray-500">No users found</div>
           ) : (
@@ -77,25 +79,49 @@ const AdminUsers: React.FC = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead>
                     <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Credits</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        User
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Role
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Credits
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Joined
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {current.map((u) => (
                       <tr key={u._id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.full_name || u.username}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {u.full_name || u.username}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {u.email}
+                        </td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              u.role === "admin"
+                                ? "bg-purple-100 text-purple-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
                             {u.role}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">{u.store_credits}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                          {u.store_credits}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right text-gray-500">
+                          {new Date(u.created_at).toLocaleDateString()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -103,11 +129,27 @@ const AdminUsers: React.FC = () => {
               </div>
 
               <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">Showing {current.length} of {users.length} users</div>
+                <div className="text-sm text-gray-600">
+                  Showing {current.length} of {users.length} users
+                </div>
                 <div className="space-x-2">
-                  <button disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))} className="px-3 py-1 rounded-md border border-gray-300 bg-white text-sm">Prev</button>
-                  <span className="text-sm">{page} / {pageCount}</span>
-                  <button disabled={page>=pageCount} onClick={()=>setPage(p=>Math.min(pageCount,p+1))} className="px-3 py-1 rounded-md border border-gray-300 bg-white text-sm">Next</button>
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="px-3 py-1 rounded-md border border-gray-300 bg-white text-sm"
+                  >
+                    Prev
+                  </button>
+                  <span className="text-sm">
+                    {page} / {pageCount}
+                  </span>
+                  <button
+                    disabled={page >= pageCount}
+                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                    className="px-3 py-1 rounded-md border border-gray-300 bg-white text-sm"
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
             </div>

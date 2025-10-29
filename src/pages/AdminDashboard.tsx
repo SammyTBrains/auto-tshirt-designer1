@@ -34,7 +34,7 @@ const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
-  const USER_LIST_LIMIT = 10;
+  const USER_LIST_LIMIT = 5;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [telegramSuccess, setTelegramSuccess] = useState("");
