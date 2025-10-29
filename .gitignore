@@ -66,3 +66,4 @@ generated_image.png
 
 .env
 /server/.env
+# Ignore env files\nserver/.env
