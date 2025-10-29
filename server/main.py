@@ -8,11 +8,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, Set
 from fastapi.responses import RedirectResponse
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent / '.env'
+load_dotenv(env_path)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, File, UploadFile, Response, BackgroundTasks, Form, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 
 # Add the parent directory to sys.path
 current_dir = Path(__file__).parent
@@ -22,6 +28,8 @@ sys.path.insert(0, str(parent_dir))
 from server.models import Task, DesignRequest, TaskStatus
 from server.task_queue import TaskQueue
 from server.utils import serialize_datetime
+from server.database import db
+from server.routes import auth_router, user_router, design_router, order_router, admin_router
 
 # Get the application root directory
 ROOT_DIR = Path(__file__).parent.parent.resolve()
@@ -51,12 +59,29 @@ setup_directories()
 logger = setup_logging()
 logger.info("Starting FastAPI server initialization...")
 
-# Initialize FastAPI app
+# Lifespan context manager for startup and shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize services on startup and cleanup on shutdown"""
+    # Startup
+    logger.info("Application startup - initializing services...")
+    await db.connect_db()
+    logger.info("Application startup complete")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Application shutdown - cleaning up...")
+    await db.close_db()
+    logger.info("Application shutdown complete")
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="AI T-Shirt Design API",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    openapi_url="/api/openapi.json",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -96,6 +121,13 @@ design_history: list = []
 
 # Connected workers
 connected_workers: Dict[str, WebSocket] = {}
+
+# Include API routers
+app.include_router(auth_router)
+app.include_router(user_router)
+app.include_router(design_router)
+app.include_router(order_router)
+app.include_router(admin_router)
 
 @app.get("/")
 async def root():
