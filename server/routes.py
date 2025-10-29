@@ -14,7 +14,7 @@ from db_models import (
     TokenData
 )
 from auth import (
-    get_current_user, get_current_admin_user,
+    get_current_user, get_current_user_optional, get_current_admin_user,
     verify_password, create_access_token
 )
 from crud import (
@@ -223,7 +223,7 @@ async def get_design(design_id: str):
 @order_router.post("/", response_model=Order, status_code=status.HTTP_201_CREATED)
 async def create_new_order(
     order: OrderCreate,
-    current_user: Optional[TokenData] = Depends(get_current_user)
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
 ):
     """Create a new order"""
     if db.get_db() is None:
@@ -277,7 +277,7 @@ async def get_order(
 @order_router.post("/{order_id}/checkout")
 async def checkout_order(
     order_id: str,
-    current_user: Optional[TokenData] = Depends(get_current_user)
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
 ):
     """Create payment intent for order checkout"""
     if not payment_service.is_enabled():
@@ -314,7 +314,7 @@ async def checkout_order(
 @order_router.post("/{order_id}/confirm-payment")
 async def confirm_order_payment(
     order_id: str,
-    current_user: Optional[TokenData] = Depends(get_current_user)
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
 ):
     """Confirm payment for an order"""
     order = await get_order_by_id(order_id)

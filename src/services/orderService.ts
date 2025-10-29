@@ -1,5 +1,5 @@
-import { apiService } from './apiService';
-import { API_ENDPOINTS } from '../config/api';
+import { apiService } from "./apiService";
+import { API_ENDPOINTS } from "../config/api";
 
 export interface OrderItem {
   product_id: string;
@@ -42,7 +42,7 @@ export interface Order {
   items: OrderItem[];
   total_amount: number;
   status: string;
-  shipping_address: OrderCreate['shipping_address'];
+  shipping_address: OrderCreate["shipping_address"];
   email: string;
   payment_intent_id?: string;
   created_at: string;
@@ -59,7 +59,10 @@ const orderService = {
    * Create a new order
    */
   async createOrder(orderData: OrderCreate): Promise<Order> {
-    const response = await apiService.post<Order>(API_ENDPOINTS.ORDERS, orderData);
+    const response = await apiService.post<Order>(
+      API_ENDPOINTS.ORDERS,
+      orderData
+    );
     return response;
   },
 
@@ -75,7 +78,9 @@ const orderService = {
    * Get specific order by ID
    */
   async getOrderById(orderId: string): Promise<Order> {
-    const response = await apiService.get<Order>(API_ENDPOINTS.ORDER_BY_ID(orderId));
+    const response = await apiService.get<Order>(
+      API_ENDPOINTS.ORDER_BY_ID(orderId)
+    );
     return response;
   },
 

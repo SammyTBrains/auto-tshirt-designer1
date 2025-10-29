@@ -63,7 +63,9 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
           items: state.items.map((item) => ({
             product_id: String(item.product.id),
             product_name: item.product.name,
-            design_id: item.product.isCustomDesign ? item.design?.imageUrl : undefined,
+            design_id: item.product.isCustomDesign
+              ? item.design?.imageUrl
+              : undefined,
             size: item.size,
             color: item.color,
             quantity: item.quantity,
@@ -473,7 +475,9 @@ function Checkout() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Shipping</span>
-                <span>{shippingCost === 0 ? "Free" : `$${shippingCost.toFixed(2)}`}</span>
+                <span>
+                  {shippingCost === 0 ? "Free" : `$${shippingCost.toFixed(2)}`}
+                </span>
               </div>
               <div className="border-t pt-2">
                 <div className="flex justify-between font-semibold text-lg">

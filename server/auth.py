@@ -21,6 +21,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1008
 
 # Security scheme
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
@@ -82,6 +83,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     if token_data is None:
         raise credentials_exception
+    
+    return token_data
+
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)) -> Optional[TokenData]:
+    """Dependency to get current user from token, or None if not authenticated"""
+    if credentials is None:
+        return None
+    
+    token = credentials.credentials
+    token_data = decode_access_token(token)
     
     return token_data
 
