@@ -302,6 +302,13 @@ async def checkout_order(
         order_id,
         OrderStatus.PROCESSING,
         payment_intent_id=payment_intent["payment_intent_id"]
+        # Notify admin that payment intent is created (customer is about to pay)
+        await telegram_service.notify_payment_intent(
+            order.order_number,
+            order.total_amount,
+            len(order.items)
+        )
+    
     )
     
     return payment_intent

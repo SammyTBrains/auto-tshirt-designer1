@@ -85,6 +85,20 @@ Items: {items_count}
 
 Order: <code>{order_number}</code>
 Amount: ${amount:.2f}
+            @staticmethod
+            async def notify_payment_intent(order_number: str, amount: float, items_count: int) -> bool:
+                """Send notification when payment intent is created (user is about to pay)"""
+                message = f"""
+        💳 <b>Payment Intent Created!</b>
+
+        Order: <code>{order_number}</code>
+        Amount: ${amount:.2f}
+        Items: {items_count}
+
+        <i>Customer is about to complete payment...</i>
+                """
+                return await TelegramService.send_message(message.strip())
+    
         """
         return await TelegramService.send_message(message.strip())
     
