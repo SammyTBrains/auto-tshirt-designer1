@@ -14,8 +14,8 @@ build/
 .env
 .env.*
 !.env.example
-!server/.env
-!worker/.env
+# Keep server and worker env files ignored so secrets aren't committed
+# If you need environment examples, add `.env.example` files instead
 
 # Model directories and files
 model_cache/
@@ -63,3 +63,6 @@ generated_image.png
 *.pyc
 
 .github
+
+.env
+/server/.env
