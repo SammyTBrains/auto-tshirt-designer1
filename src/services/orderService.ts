@@ -36,14 +36,16 @@ export interface OrderCreate {
 }
 
 export interface Order {
-  id: string;
+  _id?: string;
+  id?: string;
   order_number: string;
   user_id?: string;
   items: OrderItem[];
   total_amount: number;
   status: string;
   shipping_address: OrderCreate["shipping_address"];
-  email: string;
+  contact_email: string;
+  contact_phone?: string;
   payment_intent_id?: string;
   created_at: string;
   updated_at: string;

@@ -96,10 +96,14 @@ function CheckoutForm({ onSuccess }: CheckoutFormProps) {
         };
 
         const order = await orderService.createOrder(orderData);
-        setOrderId(order.id);
+        const orderId = order._id || order.id;
+        if (!orderId) {
+          throw new Error("Order ID not returned from server");
+        }
+        setOrderId(orderId);
 
         // Create payment intent
-        const paymentIntent = await orderService.createPaymentIntent(order.id);
+        const paymentIntent = await orderService.createPaymentIntent(orderId);
         setClientSecret(paymentIntent.client_secret);
       } catch (err: any) {
         console.error("Checkout initialization error:", err);
