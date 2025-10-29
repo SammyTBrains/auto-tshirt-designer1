@@ -379,6 +379,29 @@ async def confirm_order_payment(
     return {"status": "success", "order": updated_order}
 
 # Admin routes
+@admin_router.get("/users")
+async def get_all_users(current_user: TokenData = Depends(get_current_admin_user)):
+    """Get all registered users (admin only)"""
+    if db.get_db() is None:
+        if not await ensure_db_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not available"
+            )
+    
+    database = db.get_db()
+    users_cursor = database.users.find({}).sort("created_at", -1).limit(100)
+    users = await users_cursor.to_list(length=100)
+    
+    # Convert ObjectId to string and remove password
+    formatted_users = []
+    for user in users:
+        user["_id"] = str(user["_id"])
+        user.pop("password_hash", None)
+        formatted_users.append(user)
+    
+    return {"users": formatted_users}
+
 @admin_router.get("/analytics")
 async def get_admin_analytics(current_user: TokenData = Depends(get_current_admin_user)):
     """Get analytics dashboard data"""
