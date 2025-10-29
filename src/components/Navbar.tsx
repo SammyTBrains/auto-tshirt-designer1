@@ -213,22 +213,27 @@ function Navbar() {
             {/* User menu */}
             {isAuthenticated ? (
               <div className="flex items-center gap-2">
-                <Link 
-                  to="/profile" 
+                <Link
+                  to="/profile"
                   className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100"
+                  title={user?.email || user?.username}
                 >
                   <User className="h-5 w-5" />
-                  <span className="text-sm font-medium">{user?.username}</span>
+                  {/* show email if available, else username; truncate with ellipsis to avoid layout break */}
+                  <span className="text-sm font-medium max-w-[120px] truncate block">
+                    {user?.email ?? user?.username}
+                  </span>
                   {user && user.store_credits > 0 && (
                     <span className="ml-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">
                       {user.store_credits} credits
                     </span>
                   )}
                 </Link>
-                {user?.role === 'admin' && (
+                {user?.role === "admin" && (
                   <Link
                     to="/admin"
-                    className="px-3 py-2 rounded-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                    className="px-2 py-1 rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                    title="Admin dashboard"
                   >
                     Admin
                   </Link>
