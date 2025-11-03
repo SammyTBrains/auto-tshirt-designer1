@@ -121,30 +121,45 @@ function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
+            <Link
+              to="/"
+              className="flex items-center space-x-2 whitespace-nowrap"
+            >
               <Shirt className="h-8 w-8 text-indigo-600" />
               <span className="font-bold text-xl text-gray-900">AI Tees</span>
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link to="/shop" className="text-gray-700 hover:text-indigo-600">
+          <div className="hidden md:flex items-center space-x-8 whitespace-nowrap md:ml-10">
+            <Link
+              to="/shop"
+              className="text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+            >
               Shop
             </Link>
             <Link
               to="/custom-design"
-              className="text-gray-700 hover:text-indigo-600"
+              className="text-gray-700 hover:text-indigo-600 whitespace-nowrap"
             >
               Custom Studio
             </Link>
-            <Link to="/blog" className="text-gray-700 hover:text-indigo-600">
+            <Link
+              to="/blog"
+              className="text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+            >
               Blog
             </Link>
-            <Link to="/about" className="text-gray-700 hover:text-indigo-600">
+            <Link
+              to="/about"
+              className="text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+            >
               About
             </Link>
-            <Link to="/contact" className="text-gray-700 hover:text-indigo-600">
+            <Link
+              to="/contact"
+              className="text-gray-700 hover:text-indigo-600 whitespace-nowrap"
+            >
               Contact
             </Link>
 
@@ -215,7 +230,7 @@ function Navbar() {
               <div className="flex items-center gap-2">
                 <Link
                   to="/profile"
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100"
+                  className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-indigo-600 hover:bg-gray-100 whitespace-nowrap"
                   title={user?.email || user?.username}
                 >
                   <User className="h-5 w-5" />
@@ -224,7 +239,7 @@ function Navbar() {
                     {user?.email ?? user?.username}
                   </span>
                   {user && user.store_credits > 0 && (
-                    <span className="ml-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">
+                    <span className="ml-1 bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
                       {user.store_credits} credits
                     </span>
                   )}
