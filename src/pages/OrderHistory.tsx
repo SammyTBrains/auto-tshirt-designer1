@@ -13,29 +13,33 @@ import {
 } from "lucide-react";
 
 const OrderHistory: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
     if (!user) {
-      navigate("/login");
+      navigate("/login?redirect=/orders", { replace: true });
       return;
     }
     loadOrders();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const loadOrders = async () => {
     try {
-      setLoading(true);
+      setOrdersLoading(true);
       const data = await orderService.getMyOrders();
       setOrders(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load orders");
     } finally {
-      setLoading(false);
+      setOrdersLoading(false);
     }
   };
 
@@ -73,6 +77,14 @@ const OrderHistory: React.FC = () => {
     return "bg-gray-100 text-gray-800 border-gray-200";
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader className="h-6 w-6 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
   if (!user) {
     return null;
   }
@@ -98,7 +110,7 @@ const OrderHistory: React.FC = () => {
             </p>
           </div>
 
-          {loading && (
+          {ordersLoading && (
             <div className="bg-white rounded-lg shadow-sm p-12 text-center">
               <Loader className="h-8 w-8 mx-auto animate-spin text-indigo-600" />
               <p className="mt-4 text-gray-600">Loading orders...</p>
@@ -111,7 +123,7 @@ const OrderHistory: React.FC = () => {
             </div>
           )}
 
-          {!loading && !error && orders.length === 0 && (
+          {!ordersLoading && !error && orders.length === 0 && (
             <div className="bg-white rounded-lg shadow-sm p-12 text-center">
               <Package className="h-16 w-16 mx-auto text-gray-400 mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
@@ -129,7 +141,7 @@ const OrderHistory: React.FC = () => {
             </div>
           )}
 
-          {!loading && !error && orders.length > 0 && (
+          {!ordersLoading && !error && orders.length > 0 && (
             <div className="space-y-6">
               {orders.map((order) => (
                 <div

@@ -17,20 +17,28 @@ interface UserData {
 const PAGE_SIZE = 25;
 
 const AdminUsers: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    if (!user || user.role !== "admin") {
-      navigate("/");
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      navigate("/login?redirect=/admin/users", { replace: true });
+      return;
+    }
+
+    if (user.role !== "admin") {
+      navigate("/profile", { replace: true });
       return;
     }
     fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, authLoading, navigate]);
 
   const fetchUsers = async () => {
     try {
@@ -67,7 +75,7 @@ const AdminUsers: React.FC = () => {
         </div>
 
         <div className="bg-white shadow rounded-lg p-4">
-          {loading ? (
+          {loading || authLoading ? (
             <div className="py-8 text-center text-gray-500">
               Loading users...
             </div>

@@ -31,25 +31,34 @@ interface UserData {
 }
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [users, setUsers] = useState<UserData[]>([]);
   const USER_LIST_LIMIT = 5;
-  const [loading, setLoading] = useState(true);
+  const [isDashboardLoading, setDashboardLoading] = useState(true);
   const [error, setError] = useState("");
   const [telegramSuccess, setTelegramSuccess] = useState("");
 
   useEffect(() => {
     // Check if user is admin
-    if (!user || user.role !== "admin") {
-      navigate("/");
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      navigate("/login?redirect=/admin", { replace: true });
+      return;
+    }
+
+    if (user.role !== "admin") {
+      navigate("/profile", { replace: true });
       return;
     }
 
     fetchAnalytics();
     fetchUsers();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const fetchAnalytics = async () => {
     try {
@@ -70,7 +79,7 @@ const AdminDashboard: React.FC = () => {
       setError("Failed to load analytics");
       console.error(err);
     } finally {
-      setLoading(false);
+      setDashboardLoading(false);
     }
   };
 
@@ -133,7 +142,7 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (authLoading || isDashboardLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -255,6 +264,12 @@ const AdminDashboard: React.FC = () => {
               Quick Actions
             </h3>
             <div className="space-y-3">
+              <button
+                onClick={() => navigate("/admin/users")}
+                className="w-full px-4 py-2 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-50"
+              >
+                User Management
+              </button>
               <button
                 onClick={testTelegramNotification}
                 className="w-full px-4 py-2 rounded-md border border-gray-200 text-sm font-medium"

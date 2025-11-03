@@ -17,10 +17,10 @@ interface Transaction {
 }
 
 const Profile: React.FC = () => {
-  const { user, refreshUser, logout } = useAuth();
+  const { user, refreshUser, logout, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({
     username: user?.username || "",
@@ -30,8 +30,17 @@ const Profile: React.FC = () => {
   const [success, setSuccess] = useState("");
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+
+    if (!user) {
+      navigate("/login?redirect=/profile", { replace: true });
+      return;
+    }
+
     fetchTransactions();
-  }, []);
+  }, [user, authLoading, navigate]);
 
   const fetchTransactions = async () => {
     try {
@@ -49,7 +58,7 @@ const Profile: React.FC = () => {
     } catch (err) {
       console.error("Failed to fetch transactions:", err);
     } finally {
-      setLoading(false);
+      setTransactionsLoading(false);
     }
   };
 
@@ -74,6 +83,14 @@ const Profile: React.FC = () => {
       [e.target.name]: e.target.value,
     });
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-600 text-sm">Loading profile…</div>
+      </div>
+    );
+  }
 
   if (!user) {
     return null;
@@ -284,7 +301,7 @@ const Profile: React.FC = () => {
               <h3 className="text-xl font-bold text-gray-900 mb-4">
                 Transaction History
               </h3>
-              {loading ? (
+              {transactionsLoading ? (
                 <div className="py-8 text-center text-gray-500">
                   Loading transactions...
                 </div>

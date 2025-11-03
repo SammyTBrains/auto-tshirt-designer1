@@ -296,12 +296,8 @@ export const DraggableDesign: React.FC<DraggableDesignProps> = ({
       outputHeight
     );
 
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const croppedImageUrl = URL.createObjectURL(blob);
-        onCropComplete(croppedImageUrl);
-      }
-    }, "image/png");
+    const dataUrl = canvas.toDataURL("image/png");
+    onCropComplete(dataUrl);
   }, [onCropComplete]);
 
   useEffect(() => {

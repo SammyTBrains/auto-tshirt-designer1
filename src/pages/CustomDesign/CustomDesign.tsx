@@ -25,6 +25,7 @@ import { runtimeConfigService } from "../../services/runtimeConfigService";
 import { exportBase64Image } from "../../utils/designExport";
 import type { PercentCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
+import ProgressBar from "../../components/ProgressBar";
 
 const CustomDesign: React.FC = () => {
   const navigate = useNavigate();
@@ -57,6 +58,13 @@ const CustomDesign: React.FC = () => {
     height: 0,
   });
   const [designBaseSize, setDesignBaseSize] = useState({ width: 0, height: 0 });
+  const [originalBackgroundTexture, setOriginalBackgroundTexture] = useState<
+    string | null
+  >(null);
+  const [backgroundProgress, setBackgroundProgress] = useState(0);
+  const backgroundProgressTimer = useRef<number | null>(null);
+  const backgroundToggleDisabled =
+    isLoading || (!designTransform.hasBackground && !originalBackgroundTexture);
 
   const tshirtViews = {
     hanging:
@@ -146,6 +154,7 @@ const CustomDesign: React.FC = () => {
         scale: 1,
         position: { x: 0, y: 0 },
       });
+      setOriginalBackgroundTexture(null);
     }
   };
 
@@ -160,10 +169,14 @@ const CustomDesign: React.FC = () => {
   const handleLoadPreviousDesign = async (design: string) => {
     try {
       setIsLoadingHistory(true);
-      if (currentObjectUrl.current) {
+      if (
+        currentObjectUrl.current &&
+        currentObjectUrl.current.startsWith("blob:")
+      ) {
         URL.revokeObjectURL(currentObjectUrl.current);
       }
       setDesignTexture(design);
+      setOriginalBackgroundTexture(null);
       const defaultCenter =
         designCanvasSize.width && designCanvasSize.height
           ? {
@@ -216,6 +229,7 @@ const CustomDesign: React.FC = () => {
       setDesignColor("#000000");
       setIsPickingDesignColor(false);
       setIsCropping(false);
+      setOriginalBackgroundTexture(null);
     }
   };
 
@@ -223,23 +237,38 @@ const CustomDesign: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      if (currentObjectUrl.current) {
+      if (
+        currentObjectUrl.current &&
+        currentObjectUrl.current.startsWith("blob:")
+      ) {
         URL.revokeObjectURL(currentObjectUrl.current);
+      }
+      if (backgroundProgressTimer.current !== null) {
+        window.clearInterval(backgroundProgressTimer.current);
       }
     };
   }, []);
 
   useEffect(() => {
-    if (currentObjectUrl.current) {
+    if (
+      currentObjectUrl.current &&
+      currentObjectUrl.current.startsWith("blob:")
+    ) {
       URL.revokeObjectURL(currentObjectUrl.current);
+      currentObjectUrl.current = null;
     }
   }, [designTexture]);
 
   const handleCropComplete = (croppedImageUrl: string) => {
-    if (currentObjectUrl.current) {
+    if (
+      currentObjectUrl.current &&
+      currentObjectUrl.current.startsWith("blob:")
+    ) {
       URL.revokeObjectURL(currentObjectUrl.current);
     }
-    currentObjectUrl.current = croppedImageUrl;
+    currentObjectUrl.current = croppedImageUrl.startsWith("blob:")
+      ? croppedImageUrl
+      : null;
     setDesignTexture(croppedImageUrl);
     setIsCropping(false);
     setCrop(undefined);
@@ -349,10 +378,15 @@ const CustomDesign: React.FC = () => {
   };
 
   const handleSuccessfulGeneration = (designUrl: string) => {
-    if (currentObjectUrl.current) {
+    if (
+      currentObjectUrl.current &&
+      currentObjectUrl.current.startsWith("blob:")
+    ) {
       URL.revokeObjectURL(currentObjectUrl.current);
     }
+    currentObjectUrl.current = designUrl.startsWith("blob:") ? designUrl : null;
     setDesignTexture(designUrl);
+    setOriginalBackgroundTexture(null);
     void DesignService.saveDesignToHistory(designUrl).catch((saveError) => {
       console.error("Failed to persist design history:", saveError);
     });
@@ -410,10 +444,42 @@ const CustomDesign: React.FC = () => {
       return;
     }
 
+    if (!designTransform.hasBackground) {
+      if (!originalBackgroundTexture) {
+        setError("No original background available to restore yet.");
+        return;
+      }
+
+      setDesignTexture(originalBackgroundTexture);
+      setDesignTransform((prev) => ({
+        ...prev,
+        hasBackground: true,
+        texture: originalBackgroundTexture,
+      }));
+      setOriginalBackgroundTexture(null);
+      setBackgroundProgress(0);
+      return;
+    }
+
     if (isLoading) return;
 
     setIsLoading(true);
     setError(null);
+    setOriginalBackgroundTexture(designTexture);
+    setBackgroundProgress(10);
+    if (backgroundProgressTimer.current !== null) {
+      window.clearInterval(backgroundProgressTimer.current);
+    }
+    backgroundProgressTimer.current = window.setInterval(() => {
+      setBackgroundProgress((prev) => {
+        if (prev >= 90) {
+          return prev;
+        }
+        return prev + 5;
+      });
+    }, 200);
+
+    let completed = false;
 
     try {
       // Keep exact current position and transform state
@@ -426,16 +492,27 @@ const CustomDesign: React.FC = () => {
         setDesignTexture(processedImageUrl);
         setDesignTransform({
           ...currentTransform,
-          hasBackground: !currentTransform.hasBackground,
+          hasBackground: false,
           texture: processedImageUrl,
           // Keep the exact same position
           position: currentTransform.position,
         });
+        completed = true;
+        setBackgroundProgress(100);
       }
     } catch (error) {
       console.error("Error removing background:", error);
       setError("Failed to process image. Please try again.");
     } finally {
+      if (backgroundProgressTimer.current !== null) {
+        window.clearInterval(backgroundProgressTimer.current);
+        backgroundProgressTimer.current = null;
+      }
+      if (completed) {
+        window.setTimeout(() => setBackgroundProgress(0), 400);
+      } else {
+        setBackgroundProgress(0);
+      }
       setIsLoading(false);
     }
   };
@@ -688,9 +765,9 @@ const CustomDesign: React.FC = () => {
 
                           <button
                             onClick={handleBackgroundToggle}
-                            disabled={isLoading}
+                            disabled={backgroundToggleDisabled}
                             className={`flex items-center px-3 py-1.5 text-sm rounded-md transition-all duration-200 transform active:scale-95 ${
-                              isLoading
+                              backgroundToggleDisabled
                                 ? "opacity-50 cursor-not-allowed"
                                 : designTransform.hasBackground
                                 ? "text-gray-700 hover:bg-gray-50 border border-gray-200"
@@ -704,7 +781,7 @@ const CustomDesign: React.FC = () => {
                             )}
                             {designTransform.hasBackground
                               ? "Remove Background"
-                              : "Add Background"}
+                              : "Restore Background"}
                           </button>
 
                           <button
@@ -728,6 +805,15 @@ const CustomDesign: React.FC = () => {
                             Reset
                           </button>
                         </div>
+
+                        {backgroundProgress > 0 && (
+                          <div className="w-full px-1">
+                            <ProgressBar progress={backgroundProgress} />
+                            <p className="mt-1 text-xs text-gray-500">
+                              Removing background…
+                            </p>
+                          </div>
+                        )}
 
                         {/* Rotation Slider */}
                         <div className="flex items-center gap-2 w-full transition-all duration-200 hover:bg-gray-50 p-2 rounded-lg">
