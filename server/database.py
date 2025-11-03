@@ -47,10 +47,11 @@ class Database:
                 except Exception:
                     pass
                 cls.client = None
-                # exponential backoff
-                backoff = attempt * 2
-                logger.info(f"Retrying MongoDB connection in {backoff}s...")
-                await asyncio.sleep(backoff)
+                # exponential backoff between attempts (skip after final attempt)
+                if attempt < retries:
+                    backoff = attempt * 2
+                    logger.info(f"Retrying MongoDB connection in {backoff}s...")
+                    await asyncio.sleep(backoff)
 
         logger.warning("Application will run without database persistence after failing all MongoDB connection attempts")
         if last_exc:

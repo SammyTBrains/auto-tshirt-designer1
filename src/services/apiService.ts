@@ -164,6 +164,13 @@ class ApiService {
     });
   }
 
+  public async patch<T>(url: string, data?: any): Promise<T> {
+    return this.retryRequest(async () => {
+      const response = await this.api.patch<T>(url, data);
+      return response.data;
+    });
+  }
+
   public async checkHealth(): Promise<boolean> {
     try {
       await this.get("/health");

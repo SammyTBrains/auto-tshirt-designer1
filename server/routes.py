@@ -4,16 +4,17 @@ New API routes for authentication, user management, orders, and admin features
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from bson import ObjectId
 
 from server.db_models import (
     UserCreate, UserResponse, UserUpdate, LoginRequest, Token,
     DesignCreate, Design,
     OrderCreate, Order, OrderStatus,
     TransactionCreate, Transaction, TransactionType,
-    TokenData
+    TokenData, User, UserRole
 )
 from server.auth import (
     get_current_user, get_current_user_optional, get_current_admin_user,
@@ -24,7 +25,7 @@ from server.crud import (
     create_design, get_design_by_id, get_user_designs, increment_design_purchases,
     create_order, get_order_by_id, get_user_orders, update_order_status,
     create_transaction, get_user_transactions,
-    get_analytics_data
+    get_analytics_data, admin_update_user
 )
 from server.payment_service import payment_service
 from server.email_service import email_service
@@ -34,16 +35,16 @@ from server.database import db
 from server.config_service import config_service
 
 
-async def ensure_db_connected() -> bool:
-    """Helper to try to lazily connect to the DB when a request needs it.
+async def ensure_db_connected(retries: int = 1, timeout_ms: int = 2000) -> bool:
+    """Attempt to (re)establish a DB connection on demand without long blocking.
 
     Returns True if connected, False otherwise.
     """
     # If already connected, fast-path
     if db.get_db() is not None:
         return True
-    # Attempt to connect (this will retry internally)
-    await db.connect_db()
+    # Attempt a quick reconnect with constrained retries/timeouts so requests fail fast
+    await db.connect_db(retries=retries, timeout_ms=timeout_ms)
     return db.get_db() is not None
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,47 @@ async def get_public_runtime_config():
 
 class RuntimeConfigUpdate(BaseModel):
     updates: Dict[str, Dict[str, Any]] = Field(..., description="Nested configuration updates")
+
+
+class AdminUserUpdate(BaseModel):
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    role: Optional[UserRole] = None
+    is_active: Optional[bool] = None
+
+
+class AdminCreditAdjustment(BaseModel):
+    amount: int = Field(..., description="Positive credits the user, negative deducts")
+    reason: Optional[str] = Field(None, description="Optional note stored with the transaction")
+
+
+def format_user_payload(user: Any) -> Dict[str, Any]:
+    """Normalize user data for admin responses while stripping sensitive fields."""
+    if isinstance(user, User):
+        raw = user.dict(by_alias=True)
+    else:
+        raw = dict(user)
+
+    raw_id = raw.pop("_id", raw.pop("id", None))
+    role_value = raw.get("role", UserRole.USER.value)
+    if isinstance(role_value, UserRole):
+        role_value = role_value.value
+
+    payload = {
+        "id": str(raw_id) if raw_id is not None else None,
+        "email": raw.get("email"),
+        "username": raw.get("username"),
+        "full_name": raw.get("full_name"),
+        "role": role_value,
+        "store_credits": raw.get("store_credits", 0),
+        "is_active": raw.get("is_active", True),
+        "created_at": raw.get("created_at"),
+        "updated_at": raw.get("updated_at"),
+        "design_count": raw.get("design_count", 0),
+        "order_count": raw.get("order_count", 0),
+    }
+
+    return payload
 
 
 @admin_router.get("/config")
@@ -463,28 +505,142 @@ async def confirm_order_payment(
     return {"status": "success", "order": updated_order}
 
 # Admin routes
+
+
+@admin_router.patch("/users/{user_id}")
+async def patch_user(
+    user_id: str,
+    payload: AdminUserUpdate,
+    current_user: TokenData = Depends(get_current_admin_user),
+):
+    """Update mutable user fields as an admin."""
+    updates = payload.dict(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="No updates supplied")
+
+    if db.get_db() is None:
+        if not await ensure_db_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not available",
+            )
+
+    updated_user = await admin_update_user(user_id, updates)
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return {"user": format_user_payload(updated_user)}
+
+
+@admin_router.post("/users/{user_id}/credits-adjust")
+async def adjust_user_credits(
+    user_id: str,
+    adjustment: AdminCreditAdjustment,
+    current_user: TokenData = Depends(get_current_admin_user),
+):
+    """Adjust a user's store credits while logging a transaction."""
+    if adjustment.amount == 0:
+        raise HTTPException(status_code=400, detail="Adjustment amount cannot be zero")
+
+    if db.get_db() is None:
+        if not await ensure_db_connected():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database not available",
+            )
+
+    target_user = await get_user_by_id(user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    projected_balance = target_user.store_credits + adjustment.amount
+    if projected_balance < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Adjustment would reduce credits below zero",
+        )
+
+    transaction = await create_transaction(
+        TransactionCreate(
+            user_id=user_id,
+            amount=adjustment.amount,
+            transaction_type=TransactionType.CREDIT
+            if adjustment.amount > 0
+            else TransactionType.DEBIT,
+            description=adjustment.reason
+            or ("Admin credit" if adjustment.amount > 0 else "Admin debit"),
+        )
+    )
+
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record credit adjustment",
+        )
+
+    updated_user = await get_user_by_id(user_id)
+    return {
+        "user": format_user_payload(updated_user) if updated_user else None,
+        "transaction": transaction.dict(by_alias=True),
+    }
+
+
 @admin_router.get("/users")
-async def get_all_users(current_user: TokenData = Depends(get_current_admin_user)):
-    """Get all registered users (admin only)"""
+async def get_all_users(
+    current_user: TokenData = Depends(get_current_admin_user),
+    search: Optional[str] = Query(None, description="Match email, username, name, or user id"),
+    role: Optional[UserRole] = Query(None, description="Filter by user role"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(25, ge=1, le=100, description="Maximum number of records to return"),
+):
+    """Get registered users with optional filtering and pagination (admin only)."""
     if db.get_db() is None:
         if not await ensure_db_connected():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Database not available"
             )
-    
+
     database = db.get_db()
-    users_cursor = database.users.find({}).sort("created_at", -1).limit(100)
-    users = await users_cursor.to_list(length=100)
-    
-    # Convert ObjectId to string and remove password
-    formatted_users = []
-    for user in users:
-        user["_id"] = str(user["_id"])
-        user.pop("password_hash", None)
-        formatted_users.append(user)
-    
-    return {"users": formatted_users}
+    query: Dict[str, Any] = {}
+
+    if search:
+        regex = {"$regex": search, "$options": "i"}
+        or_filters: List[Dict[str, Any]] = [
+            {"email": regex},
+            {"username": regex},
+            {"full_name": regex},
+        ]
+        if ObjectId.is_valid(search):
+            or_filters.append({"_id": ObjectId(search)})
+        query["$or"] = or_filters
+
+    if role:
+        query["role"] = role.value if isinstance(role, UserRole) else role
+
+    if is_active is not None:
+        query["is_active"] = is_active
+
+    total = await database.users.count_documents(query)
+    cursor = (
+        database.users.find(query)
+        .sort("created_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+
+    users = await cursor.to_list(length=limit)
+    formatted_users = [format_user_payload(user) for user in users]
+
+    return {
+        "users": formatted_users,
+        "pagination": {
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        },
+    }
 
 @admin_router.get("/analytics")
 async def get_admin_analytics(current_user: TokenData = Depends(get_current_admin_user)):

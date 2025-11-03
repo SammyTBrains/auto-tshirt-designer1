@@ -144,6 +144,47 @@ async def update_user_credits(user_id: str, amount: int) -> bool:
         logger.error(f"Error updating user credits: {str(e)}")
         return False
 
+
+async def admin_update_user(user_id: str, updates: Dict[str, Any]) -> Optional[User]:
+    """Allow admin-level updates to user fields that regular users cannot modify."""
+    database = db.get_db()
+    if database is None:
+        return None
+
+    try:
+        allowed_fields = {"username", "full_name", "role", "is_active"}
+        cleaned_updates: Dict[str, Any] = {}
+
+        for key, value in updates.items():
+            if key not in allowed_fields:
+                continue
+            if key == "role" and isinstance(value, str):
+                try:
+                    value = UserRole(value)
+                except ValueError:
+                    continue
+            cleaned_updates[key] = value
+
+        if not cleaned_updates:
+            return await get_user_by_id(user_id)
+
+        # Convert enums to their value for storage
+        if "role" in cleaned_updates and isinstance(cleaned_updates["role"], UserRole):
+            cleaned_updates["role"] = cleaned_updates["role"].value
+
+        cleaned_updates["updated_at"] = datetime.utcnow()
+
+        await database.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": cleaned_updates},
+        )
+
+        return await get_user_by_id(user_id)
+
+    except Exception as e:
+        logger.error(f"Error performing admin user update: {str(e)}")
+        return None
+
 # Design CRUD operations
 async def create_design(design: DesignCreate, user_id: str) -> Optional[Design]:
     """Create a new design"""

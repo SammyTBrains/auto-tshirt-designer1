@@ -33,6 +33,10 @@ export const API_ENDPOINTS = {
     `/api/admin/orders/${id}/update-status`,
   ADMIN_TELEGRAM_TEST: "/api/admin/telegram/test",
   ADMIN_DAILY_REPORT: "/api/admin/analytics/send-daily-report",
+  ADMIN_USERS: "/api/admin/users",
+  ADMIN_USER_DETAIL: (id: string) => `/api/admin/users/${id}`,
+  ADMIN_USER_CREDIT_ADJUST: (id: string) =>
+    `/api/admin/users/${id}/credits-adjust`,
   ADMIN_CONFIG: "/api/admin/config",
   ADMIN_CONFIG_REFRESH: "/api/admin/config/refresh",
   ADMIN_PRINTIFY_TEST: "/api/admin/printify/test",
