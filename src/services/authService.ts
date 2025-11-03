@@ -1,14 +1,15 @@
 /**
  * Authentication service for API calls
  */
-import { API_BASE_URL, API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS } from "../config/api";
+import { apiService } from "./apiService";
 
 export interface User {
   id: string;
   email: string;
   username: string;
   full_name?: string;
-  role: 'user' | 'admin';
+  role: "user" | "admin";
   store_credits: number;
   is_active: boolean;
   created_at: string;
@@ -36,12 +37,12 @@ class AuthService {
 
   constructor() {
     // Load token from localStorage on initialization
-    this.token = localStorage.getItem('auth_token');
+    this.token = localStorage.getItem("auth_token");
   }
 
   setToken(token: string) {
     this.token = token;
-    localStorage.setItem('auth_token', token);
+    localStorage.setItem("auth_token", token);
   }
 
   getToken(): string | null {
@@ -50,7 +51,7 @@ class AuthService {
 
   clearToken() {
     this.token = null;
-    localStorage.removeItem('auth_token');
+    localStorage.removeItem("auth_token");
   }
 
   isAuthenticated(): boolean {
@@ -62,80 +63,41 @@ class AuthService {
       return {};
     }
     return {
-      'Authorization': `Bearer ${this.token}`,
+      Authorization: `Bearer ${this.token}`,
     };
   }
 
   async register(data: RegisterRequest): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_REGISTER}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Registration failed');
-    }
-
-    return response.json();
+    return apiService.post<User>(API_ENDPOINTS.AUTH_REGISTER, data);
   }
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.AUTH_LOGIN}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Login failed');
-    }
-
-    const authData = await response.json();
-    this.setToken(authData.access_token);
-    return authData;
+    const authData = await apiService.post<
+      AuthResponse | { access_token: string }
+    >(API_ENDPOINTS.AUTH_LOGIN, data);
+    // Normalize and store token
+    const token = (authData as any).access_token;
+    this.setToken(token);
+    return authData as AuthResponse;
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.USER_ME}`, {
-      headers: {
-        ...this.getAuthHeaders(),
-      },
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
+    try {
+      return await apiService.get<User>(API_ENDPOINTS.USER_ME);
+    } catch (err: any) {
+      if (
+        String(err?.message || "")
+          .toLowerCase()
+          .includes("unauthorized")
+      ) {
         this.clearToken();
       }
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to get user');
+      throw err;
     }
-
-    return response.json();
   }
 
   async updateProfile(data: Partial<RegisterRequest>): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.USER_ME}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.detail || 'Failed to update profile');
-    }
-
-    return response.json();
+    return apiService.put<User>(API_ENDPOINTS.USER_ME, data);
   }
 
   logout() {

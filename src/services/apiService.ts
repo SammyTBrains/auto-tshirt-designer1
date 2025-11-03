@@ -1,10 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from "axios";
 import { authService } from "./authService";
-
-const isDevelopment = import.meta.env.MODE === "development";
-const API_BASE_URL = isDevelopment
-  ? "http://localhost:8000"
-  : "https://aitshirts.in/api";
+import { API_BASE_URL } from "../config/api";
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // 1 second
 
@@ -25,14 +21,10 @@ class ApiService {
       const token = authService.getToken();
       if (token) {
         if (!config.headers) {
-          config.headers = { Authorization: `Bearer ${token}` };
-        } else if ("set" in config.headers) {
-          config.headers.set("Authorization", `Bearer ${token}`);
-        } else {
-          (
-            config.headers as Record<string, string>
-          ).Authorization = `Bearer ${token}`;
+          config.headers = {} as any;
         }
+        // Set Authorization header in a type-safe, version-agnostic way
+        (config.headers as any)["Authorization"] = `Bearer ${token}`;
       }
       return config;
     });
