@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { authService } from "../services/authService";
 import { useNavigate } from "react-router-dom";
 import { API_BASE_URL, API_ENDPOINTS } from "../config/api";
+import RuntimeConfigPanel from "../components/Admin/RuntimeConfigPanel";
 
 interface AnalyticsData {
   total_users: number;
@@ -346,6 +347,10 @@ const AdminDashboard: React.FC = () => {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="mt-8">
+        <RuntimeConfigPanel />
       </div>
     </div>
   );

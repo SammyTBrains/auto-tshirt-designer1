@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from "axios";
+import { authService } from "./authService";
 
 const isDevelopment = import.meta.env.MODE === "development";
 const API_BASE_URL = isDevelopment
@@ -17,6 +18,23 @@ class ApiService {
         "Content-Type": "application/json",
       },
       timeout: 120000, // 120 seconds
+    });
+
+    // Inject auth token for protected endpoints when available
+    this.api.interceptors.request.use((config) => {
+      const token = authService.getToken();
+      if (token) {
+        if (!config.headers) {
+          config.headers = { Authorization: `Bearer ${token}` };
+        } else if ("set" in config.headers) {
+          config.headers.set("Authorization", `Bearer ${token}`);
+        } else {
+          (
+            config.headers as Record<string, string>
+          ).Authorization = `Bearer ${token}`;
+        }
+      }
+      return config;
     });
 
     // Add response interceptor for error handling

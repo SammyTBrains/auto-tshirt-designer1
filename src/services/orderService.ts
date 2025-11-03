@@ -47,6 +47,8 @@ export interface Order {
   contact_email: string;
   contact_phone?: string;
   payment_intent_id?: string;
+  printify_order_id?: string | null;
+  printify_status?: string | null;
   created_at: string;
   updated_at: string;
 }

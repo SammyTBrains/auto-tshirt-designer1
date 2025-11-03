@@ -1,73 +1,97 @@
-"""
-Telegram bot service for admin notifications
-"""
-import os
+"""Telegram bot service for admin notifications."""
+from __future__ import annotations
+
 import logging
-from typing import Optional
-import asyncio
+import os
+from typing import Any, Optional
+
+from server.config_service import config_service
 
 logger = logging.getLogger(__name__)
 
-# Telegram configuration
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-TELEGRAM_ENABLED = bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
-
-if not TELEGRAM_ENABLED:
-    logger.warning("Telegram bot is not configured. Notifications will be disabled.")
-
-# Lazy import telegram library
-telegram_bot = None
-if TELEGRAM_ENABLED:
-    try:
-        from telegram import Bot
-        telegram_bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    except ImportError:
-        logger.error("python-telegram-bot not installed. Install with: pip install python-telegram-bot")
-        TELEGRAM_ENABLED = False
-    except Exception as e:
-        logger.error(f"Error initializing Telegram bot: {str(e)}")
-        TELEGRAM_ENABLED = False
-
 
 class TelegramService:
-    """Service for sending Telegram notifications"""
+    """Service for sending Telegram notifications backed by runtime config."""
 
-    @staticmethod
-    def is_enabled() -> bool:
-        """Check if Telegram is properly configured"""
-        return TELEGRAM_ENABLED and telegram_bot is not None
+    def __init__(self) -> None:
+        self.bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+        self._bot: Optional[Any] = None
+        self._enabled = False
+        self._telegram_import_error: Optional[str] = None
 
-    @staticmethod
-    async def send_message(message: str) -> bool:
-        """
-        Send a message to the admin Telegram chat
+        self._configure_bot()
+        config_service.add_listener(self._on_config_updated)
 
-        Args:
-            message: Message text
+    def _configure_bot(self) -> None:
+        if not (self.bot_token and self.chat_id):
+            if self._enabled:
+                logger.warning("Telegram bot credentials missing; disabling notifications.")
+            self._bot = None
+            self._enabled = False
+            return
 
-        Returns:
-            True if sent successfully, False otherwise
-        """
-        if not TelegramService.is_enabled():
-            logger.warning("Telegram not configured, skipping message")
+        try:
+            from telegram import Bot
+        except ImportError:
+            self._bot = None
+            self._enabled = False
+            self._telegram_import_error = (
+                "python-telegram-bot not installed. Install with: pip install python-telegram-bot"
+            )
+            logger.error(self._telegram_import_error)
+            return
+
+        try:
+            self._bot = Bot(token=self.bot_token)
+            self._enabled = True
+            self._telegram_import_error = None
+            logger.info("Telegram bot configured for chat %s", self.chat_id)
+        except Exception as exc:  # pragma: no cover - network/remote issues
+            self._bot = None
+            self._enabled = False
+            logger.error("Error initializing Telegram bot: %s", exc)
+
+    async def _on_config_updated(self, settings: dict[str, Any]) -> None:
+        branch = settings.get("telegram", {}) if settings else {}
+        if not branch:
+            return
+
+        def coalesce(current: str, new_value: Any) -> str:
+            if new_value is None:
+                return current
+            if isinstance(new_value, str) and not new_value.strip():
+                return current
+            return str(new_value)
+
+        token = coalesce(self.bot_token, branch.get("bot_token"))
+        chat_id = coalesce(self.chat_id, branch.get("chat_id"))
+
+        if token != self.bot_token or chat_id != self.chat_id:
+            self.bot_token = token
+            self.chat_id = chat_id
+            self._configure_bot()
+
+    def is_enabled(self) -> bool:
+        return self._enabled and self._bot is not None
+
+    async def send_message(self, message: str) -> bool:
+        if not self.is_enabled():
+            if self._telegram_import_error:
+                logger.warning(self._telegram_import_error)
+            else:
+                logger.warning("Telegram not configured, skipping message")
             return False
 
         try:
-            await telegram_bot.send_message(
-                chat_id=TELEGRAM_CHAT_ID,
-                text=message,
-                parse_mode="HTML",
-            )
+            await self._bot.send_message(chat_id=self.chat_id, text=message, parse_mode="HTML")
             logger.info("Telegram message sent")
             return True
-
-        except Exception as e:
-            logger.error(f"Error sending Telegram message: {str(e)}")
+        except Exception as exc:  # pragma: no cover - network/remote issues
+            logger.error("Error sending Telegram message: %s", exc)
             return False
 
-    @staticmethod
-    async def notify_new_order(order_number: str, total_amount: float, items_count: int) -> bool:
+    async def notify_new_order(self, order_number: str, total_amount: float, items_count: int) -> bool:
         """Send notification about new paid order"""
         message = f"""
 <b>New Order Received</b>
@@ -76,10 +100,9 @@ Order: <code>{order_number}</code>
 Amount: ${total_amount:.2f}
 Items: {items_count}
         """
-        return await TelegramService.send_message(message.strip())
+        return await self.send_message(message.strip())
 
-    @staticmethod
-    async def notify_payment_received(order_number: str, amount: float) -> bool:
+    async def notify_payment_received(self, order_number: str, amount: float) -> bool:
         """Send notification about a successful payment"""
         message = f"""
 <b>Payment Received</b>
@@ -87,10 +110,9 @@ Items: {items_count}
 Order: <code>{order_number}</code>
 Amount: ${amount:.2f}
         """
-        return await TelegramService.send_message(message.strip())
+        return await self.send_message(message.strip())
 
-    @staticmethod
-    async def notify_payment_intent(order_number: str, amount: float, items_count: int) -> bool:
+    async def notify_payment_intent(self, order_number: str, amount: float, items_count: int) -> bool:
         """Notify when a payment intent is created (customer is about to pay)"""
         message = f"""
 <b>Payment Intent Created</b>
@@ -101,10 +123,9 @@ Items: {items_count}
 
 <i>Customer is about to complete payment...</i>
         """
-        return await TelegramService.send_message(message.strip())
+        return await self.send_message(message.strip())
 
-    @staticmethod
-    async def notify_trending_design(design_prompt: str, purchases: int) -> bool:
+    async def notify_trending_design(self, design_prompt: str, purchases: int) -> bool:
         """Send notification about a trending design"""
         message = f"""
 <b>Trending Design</b>
@@ -112,10 +133,10 @@ Items: {items_count}
 Design: "{design_prompt}"
 Purchases: {purchases}
         """
-        return await TelegramService.send_message(message.strip())
+        return await self.send_message(message.strip())
 
-    @staticmethod
     async def send_daily_analytics(
+        self,
         total_orders: int,
         total_revenue: float,
         new_users: int,
@@ -130,17 +151,16 @@ Revenue: ${total_revenue:.2f}
 New Users: {new_users}
 New Designs: {new_designs}
         """
-        return await TelegramService.send_message(message.strip())
+        return await self.send_message(message.strip())
 
-    @staticmethod
-    async def notify_system_alert(alert_type: str, message: str) -> bool:
+    async def notify_system_alert(self, alert_type: str, message: str) -> bool:
         """Send system alert"""
         alert_message = f"""
 <b>System Alert: {alert_type}</b>
 
 {message}
         """
-        return await TelegramService.send_message(alert_message.strip())
+        return await self.send_message(alert_message.strip())
 
 
 # Create singleton instance

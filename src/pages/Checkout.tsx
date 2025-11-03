@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import {
   Elements,
   CardElement,
@@ -12,10 +12,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import orderService, { OrderCreate } from "../services/orderService";
 import { CheckCircle, Loader, AlertCircle } from "lucide-react";
-
-const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ""
-);
+import { runtimeConfigService } from "../services/runtimeConfigService";
 
 interface CheckoutFormProps {
   onSuccess: () => void;
@@ -393,6 +390,10 @@ function Checkout() {
   const { state } = useCart();
   const navigate = useNavigate();
   const [orderComplete, setOrderComplete] = useState(false);
+  const [stripePromise, setStripePromise] =
+    useState<Promise<Stripe | null> | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
 
   const shippingCost = state.total > 50 ? 0 : 4.99;
   const total = state.total + shippingCost;
@@ -402,6 +403,30 @@ function Checkout() {
       navigate("/cart");
     }
   }, [state.items, orderComplete, navigate]);
+
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const config = await runtimeConfigService.getPublicConfig();
+        const key = config.stripe?.publishable_key;
+        if (!key) {
+          setConfigError("Stripe publishable key is not configured");
+          return;
+        }
+        setStripePromise(loadStripe(key));
+      } catch (error) {
+        setConfigError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load payment configuration"
+        );
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
 
   if (orderComplete) {
     return (
@@ -446,6 +471,17 @@ function Checkout() {
     return null;
   }
 
+  if (configLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <Loader className="h-6 w-6 mx-auto animate-spin text-indigo-600" />
+          <p className="mt-4 text-gray-600">Loading payment configuration...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Helmet>
@@ -456,12 +492,25 @@ function Checkout() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
+        {configError && (
+          <div className="mb-6 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {configError}
+          </div>
+        )}
+
         <div className="grid md:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="md:col-span-2">
-            <Elements stripe={stripePromise}>
-              <CheckoutForm onSuccess={() => setOrderComplete(true)} />
-            </Elements>
+            {stripePromise ? (
+              <Elements stripe={stripePromise}>
+                <CheckoutForm onSuccess={() => setOrderComplete(true)} />
+              </Elements>
+            ) : (
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-6 text-sm text-yellow-800">
+                Payment configuration is incomplete. Please update the Stripe
+                keys in the admin dashboard.
+              </div>
+            )}
           </div>
 
           {/* Order Summary */}

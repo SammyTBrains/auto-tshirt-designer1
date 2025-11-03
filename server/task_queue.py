@@ -1,4 +1,5 @@
 import logging
+import copy
 from datetime import datetime, timedelta
 import uuid
 from typing import Optional, Dict, List, Tuple, Any, Set
@@ -23,40 +24,99 @@ except ImportError:  # pragma: no cover - library is optional at runtime
 logger = logging.getLogger(__name__)
 
 class TaskQueue:
-    def __init__(self):
+    def __init__(self, config_service: Optional[Any] = None):
         self.tasks = {}  # type: Dict[str, Task]
         self.pending_tasks = []  # type: List[Task]
         self.processing_tasks = {}  # type: Dict[str, Task]
         self.completed_tasks = {}  # type: Dict[str, dict]
         self.failed_tasks = set()  # type: Set[str]
         self.task_timeout = 300  # 5 minutes
+        self.config_service = config_service
+        self._hf_settings: Dict[str, Any] = {}
+        self.api_headers: Dict[str, str] = {"Accept": "image/png"}
+        self.api_url = ""
+        self.api_timeout = 120.0
+        self.hf_model = "stabilityai/stable-diffusion-3.5-large"
+        self.hf_provider: Optional[str] = None
+        self.provider_config: Optional[Dict[str, Any]] = None
+        self.inference_client = None
+
         # Load environment variables from server/.env so local runs pick up the token
         env_path = Path(__file__).parent / ".env"
         load_dotenv(dotenv_path=env_path, override=False)
+
+        self._apply_env_defaults()
+
+        if self.config_service:
+            self.config_service.add_listener(self._on_config_updated)
+        
+        # Get root directory and set up outputs directory
+        self.root_dir = Path(__file__).parent.parent.resolve()
+        self.outputs_dir = self.root_dir / "outputs"
+        self.outputs_dir.mkdir(exist_ok=True)
+        
+        logger.info(f"Outputs directory: {self.outputs_dir}")
+
+    def _apply_env_defaults(self) -> None:
+        """Load Hugging Face settings from environment as baseline."""
 
         default_model = "stabilityai/stable-diffusion-3.5-large"
         default_base_url = "https://router.huggingface.co/hf-inference/models"
         configured_base = os.getenv("HUGGINGFACE_API_BASE", default_base_url).rstrip("/")
         configured_model = os.getenv("HUGGINGFACE_MODEL", default_model).strip()
-        self.api_url = f"{configured_base}/{configured_model}" if configured_model else f"{configured_base}/{default_model}"
-        try:
-            self.api_timeout = float(os.getenv("HUGGINGFACE_TIMEOUT", "120"))
-        except ValueError:
-            self.api_timeout = 120.0
-
-        hf_token = os.getenv("HUGGINGFACE_TOKEN", "").strip()
-        self.api_headers: Dict[str, str] = {"Accept": "image/png"}
-        if not hf_token:
-            logger.warning("HUGGINGFACE_TOKEN missing; API generation will fail until it is set.")
-        else:
-            logger.info("Hugging Face token detected (masked).")
-            self.api_headers["Authorization"] = f"Bearer {hf_token}"
-
-        self.hf_model = configured_model or default_model
+        token = os.getenv("HUGGINGFACE_TOKEN", "").strip()
         provider_raw = os.getenv("HUGGINGFACE_PROVIDER", "").strip()
-        self.hf_provider: Optional[str] = None
-        self.provider_config: Optional[Dict[str, Any]] = None
+        try:
+            timeout = float(os.getenv("HUGGINGFACE_TIMEOUT", "120"))
+        except ValueError:
+            timeout = 120.0
 
+        env_settings = {
+            "base_url": configured_base,
+            "model": configured_model or default_model,
+            "token": token,
+            "provider": provider_raw or None,
+            "timeout": timeout,
+        }
+        self._hf_settings = env_settings
+        self._configure_from_settings(env_settings)
+
+    async def _on_config_updated(self, settings: Dict[str, Any]) -> None:
+        huggingface_settings = settings.get("huggingface", {}) if settings else {}
+        self._configure_from_settings(huggingface_settings or self._hf_settings)
+
+    async def apply_settings(self, settings: Dict[str, Any]) -> None:
+        """Explicitly apply new Hugging Face settings."""
+
+        self._configure_from_settings(settings.get("huggingface", {}) if settings else {})
+
+    def _configure_from_settings(self, huggingface_settings: Dict[str, Any]) -> None:
+        settings = copy.deepcopy(self._hf_settings)
+        settings.update({k: v for k, v in huggingface_settings.items() if v not in (None, "")})
+        self._hf_settings = settings
+
+        base_url = settings.get("base_url", "https://router.huggingface.co/hf-inference/models").rstrip("/")
+        model = settings.get("model", "stabilityai/stable-diffusion-3.5-large").strip()
+        token = (settings.get("token") or "").strip()
+        provider_raw = (settings.get("provider") or "").strip()
+        try:
+            timeout = float(settings.get("timeout", 120.0))
+        except (TypeError, ValueError):
+            timeout = 120.0
+
+        self.api_url = f"{base_url}/{model}" if model else base_url
+        self.api_timeout = timeout
+        self.hf_model = model or "stabilityai/stable-diffusion-3.5-large"
+        self.api_headers = {"Accept": "image/png"}
+
+        if token:
+            self.api_headers["Authorization"] = f"Bearer {token}"
+            logger.info("Hugging Face token configured (masked).")
+        else:
+            logger.warning("Hugging Face token missing; API generation will fail until it is set.")
+
+        self.hf_provider = None
+        self.provider_config = None
         if provider_raw:
             lowered = provider_raw.lower()
             if lowered not in {"auto", "default"}:
@@ -69,12 +129,9 @@ class TaskQueue:
                             if isinstance(vendor, str) and vendor:
                                 self.hf_provider = vendor
                         else:
-                            logger.warning(
-                                "HUGGINGFACE_PROVIDER JSON must decode to an object. Ignoring value: %s",
-                                provider_raw,
-                            )
+                            logger.warning("Hugging Face provider JSON must decode to an object. Ignoring value: %s", provider_raw)
                     except json.JSONDecodeError as exc:
-                        logger.warning("Failed to parse HUGGINGFACE_PROVIDER JSON: %s", exc)
+                        logger.warning("Failed to parse Hugging Face provider JSON: %s", exc)
                 else:
                     self.hf_provider = provider_raw
                     self.provider_config = {"vendor": provider_raw}
@@ -82,11 +139,12 @@ class TaskQueue:
         if self.provider_config:
             logger.info("Using custom provider configuration: %s", self.provider_config)
 
+        token_for_client = token
         self.inference_client = None
-        if hf_token and InferenceClient:
+        if token_for_client and InferenceClient:
             client_kwargs: Dict[str, Any] = {
                 "model": self.hf_model,
-                "token": hf_token,
+                "token": token_for_client,
                 "timeout": self.api_timeout,
             }
             if self.hf_provider:
@@ -95,16 +153,9 @@ class TaskQueue:
                 self.inference_client = InferenceClient(**client_kwargs)
                 logger.info("Initialized Hugging Face InferenceClient for model %s", self.hf_model)
             except Exception as exc:
-                logger.warning("Failed to initialize InferenceClient: %s", exc)
-        elif hf_token and not InferenceClient:
+                logger.warning("Failed to initialize Hugging Face InferenceClient: %s", exc)
+        elif token_for_client and not InferenceClient:
             logger.warning("huggingface_hub not installed; falling back to raw HTTP requests.")
-        
-        # Get root directory and set up outputs directory
-        self.root_dir = Path(__file__).parent.parent.resolve()
-        self.outputs_dir = self.root_dir / "outputs"
-        self.outputs_dir.mkdir(exist_ok=True)
-        
-        logger.info(f"Outputs directory: {self.outputs_dir}")
 
     async def save_image(self, image_data: bytes, task_id: str) -> Tuple[str, str]:
         """Save image data to a file and return the filename and base64 data"""

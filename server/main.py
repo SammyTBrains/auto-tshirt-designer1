@@ -29,7 +29,15 @@ from server.models import Task, DesignRequest, TaskStatus
 from server.task_queue import TaskQueue
 from server.utils import serialize_datetime
 from server.database import db
-from server.routes import auth_router, user_router, design_router, order_router, admin_router
+from server.routes import (
+    auth_router,
+    user_router,
+    design_router,
+    order_router,
+    admin_router,
+    config_router,
+)
+from server.config_service import config_service
 
 # Get the application root directory
 ROOT_DIR = Path(__file__).parent.parent.resolve()
@@ -66,6 +74,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Application startup - initializing services...")
     await db.connect_db()
+    try:
+        await config_service.initialize()
+    except Exception as exc:
+        logger.error("Failed to initialize runtime configuration: %s", exc, exc_info=True)
     logger.info("Application startup complete")
     
     yield
@@ -116,7 +128,7 @@ class CORSStaticFiles(StaticFiles):
 app.mount("/images", CORSStaticFiles(directory=str(OUTPUTS_DIR)), name="images")
 
 # Initialize task queue
-task_queue = TaskQueue()
+task_queue = TaskQueue(config_service=config_service)
 design_history: list = []
 
 # Connected workers
@@ -128,6 +140,7 @@ app.include_router(user_router)
 app.include_router(design_router)
 app.include_router(order_router)
 app.include_router(admin_router)
+app.include_router(config_router)
 
 @app.get("/")
 async def root():

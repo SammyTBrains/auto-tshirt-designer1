@@ -146,8 +146,14 @@ const Profile: React.FC = () => {
             {/* Quick actions */}
             <div className="bg-white shadow-md rounded-xl p-4 space-y-3">
               <button
-                onClick={() => navigate("/custom-design")}
+                onClick={() => navigate("/orders")}
                 className="w-full px-4 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium hover:shadow-lg transition"
+              >
+                View Orders
+              </button>
+              <button
+                onClick={() => navigate("/custom-design")}
+                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition"
               >
                 Create New Design
               </button>

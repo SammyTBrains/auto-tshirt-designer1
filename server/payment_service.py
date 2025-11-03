@@ -1,202 +1,174 @@
-"""
-Stripe payment integration service
-"""
-import os
-import logging
+"""Stripe payment integration service with dynamic runtime configuration."""
+from __future__ import annotations
+
 import asyncio
-from typing import Optional, Dict, Any
+import logging
+import os
+from typing import Any, Dict, Optional
+
 import stripe
 
-from server.db_models import Order, OrderStatus
+from server.config_service import config_service
 
 logger = logging.getLogger(__name__)
 
-# Initialize Stripe
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_ENABLED = bool(stripe.api_key and stripe.api_key.startswith("sk_"))
-
-if not STRIPE_ENABLED:
-    logger.warning("Stripe is not configured. Payment processing will be disabled.")
 
 class PaymentService:
-    """Service for handling Stripe payments"""
-    
-    @staticmethod
-    def is_enabled() -> bool:
-        """Check if Stripe is properly configured"""
-        return STRIPE_ENABLED
-    
-    @staticmethod
+    """Service for handling Stripe payments."""
+
+    def __init__(self) -> None:
+        self._secret_key = os.getenv("STRIPE_SECRET_KEY", "")
+        self._enabled = False
+        self._lock = asyncio.Lock()
+        self._apply_secret(self._secret_key)
+        config_service.add_listener(self._on_config_updated)
+
+    async def _on_config_updated(self, settings: Dict[str, Any]) -> None:
+        stripe_settings = settings.get("stripe", {}) if settings else {}
+        secret = stripe_settings.get("secret_key") or os.getenv("STRIPE_SECRET_KEY", "")
+        await self.set_secret(secret)
+
+    def _apply_secret(self, secret_key: str) -> None:
+        key = secret_key.strip()
+        if not key:
+            self._enabled = False
+            logger.warning("Stripe secret key missing; payment processing disabled.")
+            return
+
+        stripe.api_key = key
+        self._secret_key = key
+        self._enabled = key.startswith("sk_")
+        if self._enabled:
+            logger.info("Stripe configured successfully (masked).")
+        else:
+            logger.warning("Stripe key does not appear to be valid; check configuration.")
+
+    async def set_secret(self, secret_key: str) -> None:
+        async with self._lock:
+            if secret_key != self._secret_key:
+                self._apply_secret(secret_key)
+
+    def is_enabled(self) -> bool:
+        return self._enabled
+
     async def create_payment_intent(
+        self,
         amount: float,
         currency: str = "usd",
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
-        """
-        Create a Stripe payment intent
-        
-        Args:
-            amount: Amount in dollars (will be converted to cents)
-            currency: Currency code (default: usd)
-            metadata: Additional metadata to attach to the payment
-        
-        Returns:
-            Payment intent data or None if failed
-        """
-        if not STRIPE_ENABLED:
+        if not self.is_enabled():
             logger.error("Stripe is not configured")
             return None
-        
+
         try:
-            # Convert dollars to cents
             amount_cents = int(amount * 100)
-            
             payment_intent = stripe.PaymentIntent.create(
                 amount=amount_cents,
                 currency=currency,
                 metadata=metadata or {},
-                automatic_payment_methods={
-                    "enabled": True,
-                },
+                automatic_payment_methods={"enabled": True},
             )
-            
-            logger.info(f"Created payment intent: {payment_intent.id}")
-            
+
+            logger.info("Created payment intent %s", payment_intent.id)
+
             return {
                 "client_secret": payment_intent.client_secret,
                 "payment_intent_id": payment_intent.id,
                 "amount": amount,
-                "currency": currency
+                "currency": currency,
             }
-        
-        except stripe.error.StripeError as e:
-            logger.error(f"Stripe error: {str(e)}")
+
+        except stripe.error.StripeError as err:
+            logger.error("Stripe error: %s", err)
             return None
-        except Exception as e:
-            logger.error(f"Error creating payment intent: {str(e)}")
+        except Exception as err:  # pragma: no cover - defensive logging
+            logger.error("Error creating payment intent: %s", err)
             return None
-    
-    @staticmethod
-    async def confirm_payment(payment_intent_id: str, wait_seconds: float = 6.0) -> bool:
-        """
-        Confirm a payment was successful
-        
-        Args:
-            payment_intent_id: Stripe payment intent ID
-            wait_seconds: How long to poll for success if the payment is still processing
-        
-        Returns:
-            True if payment succeeded, False otherwise
-        """
-        if not STRIPE_ENABLED:
+
+    async def confirm_payment(self, payment_intent_id: str, wait_seconds: float = 6.0) -> bool:
+        if not self.is_enabled():
             logger.error("Stripe is not configured")
             return False
-        
+
         try:
             deadline = asyncio.get_event_loop().time() + max(0.5, wait_seconds)
-            last_status = None
             while True:
                 payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
                 status = getattr(payment_intent, "status", None)
-                last_status = status
-                logger.info(f"Stripe payment_intent {payment_intent_id} status: {status}")
+                logger.info("Stripe payment_intent %s status: %s", payment_intent_id, status)
 
                 if status == "succeeded":
                     return True
                 if status in {"canceled", "requires_payment_method"}:
                     return False
-                # For statuses that may complete shortly, poll briefly
                 if status in {"processing", "requires_capture", "requires_action"}:
                     if asyncio.get_event_loop().time() < deadline:
                         await asyncio.sleep(0.5)
                         continue
-                    else:
-                        logger.warning(
-                            f"Payment intent {payment_intent_id} still {status} after polling; treating as failure"
-                        )
-                        return False
-                # Unknown status; poll a bit and then give up
+                    logger.warning(
+                        "Payment intent %s still %s after polling; treating as failure",
+                        payment_intent_id,
+                        status,
+                    )
+                    return False
                 if asyncio.get_event_loop().time() < deadline:
                     await asyncio.sleep(0.5)
                     continue
                 return False
 
-        except stripe.error.StripeError as e:
-            logger.error(f"Stripe error: {str(e)}")
+        except stripe.error.StripeError as err:
+            logger.error("Stripe error: %s", err)
             return False
-        except Exception as e:
-            logger.error(f"Error confirming payment: {str(e)}")
+        except Exception as err:  # pragma: no cover - defensive logging
+            logger.error("Error confirming payment: %s", err)
             return False
-    
-    @staticmethod
+
     async def refund_payment(
+        self,
         payment_intent_id: str,
         amount: Optional[float] = None,
-        reason: Optional[str] = None
+        reason: Optional[str] = None,
     ) -> bool:
-        """
-        Refund a payment
-        
-        Args:
-            payment_intent_id: Stripe payment intent ID
-            amount: Amount to refund in dollars (None for full refund)
-            reason: Reason for refund
-        
-        Returns:
-            True if refund succeeded, False otherwise
-        """
-        if not STRIPE_ENABLED:
+        if not self.is_enabled():
             logger.error("Stripe is not configured")
             return False
-        
+
         try:
-            refund_params = {
-                "payment_intent": payment_intent_id,
-            }
-            
+            refund_params: Dict[str, Any] = {"payment_intent": payment_intent_id}
+
             if amount is not None:
                 refund_params["amount"] = int(amount * 100)
-            
+
             if reason:
                 refund_params["reason"] = reason
-            
+
             refund = stripe.Refund.create(**refund_params)
-            
-            logger.info(f"Created refund: {refund.id}")
+            logger.info("Created refund %s", refund.id)
             return refund.status == "succeeded"
-        
-        except stripe.error.StripeError as e:
-            logger.error(f"Stripe error: {str(e)}")
+
+        except stripe.error.StripeError as err:
+            logger.error("Stripe error: %s", err)
             return False
-        except Exception as e:
-            logger.error(f"Error creating refund: {str(e)}")
+        except Exception as err:  # pragma: no cover
+            logger.error("Error creating refund: %s", err)
             return False
-    
-    @staticmethod
-    async def get_payment_status(payment_intent_id: str) -> Optional[str]:
-        """
-        Get the status of a payment
-        
-        Args:
-            payment_intent_id: Stripe payment intent ID
-        
-        Returns:
-            Payment status string or None if failed
-        """
-        if not STRIPE_ENABLED:
+
+    async def get_payment_status(self, payment_intent_id: str) -> Optional[str]:
+        if not self.is_enabled():
             logger.error("Stripe is not configured")
             return None
-        
+
         try:
             payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
             return payment_intent.status
-        
-        except stripe.error.StripeError as e:
-            logger.error(f"Stripe error: {str(e)}")
+
+        except stripe.error.StripeError as err:
+            logger.error("Stripe error: %s", err)
             return None
-        except Exception as e:
-            logger.error(f"Error getting payment status: {str(e)}")
+        except Exception as err:  # pragma: no cover
+            logger.error("Error getting payment status: %s", err)
             return None
 
-# Create a singleton instance
+
 payment_service = PaymentService()

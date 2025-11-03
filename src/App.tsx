@@ -5,6 +5,7 @@ import { CartProvider } from "./context/CartContext";
 import { AuthProvider } from "./context/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import { ToastProvider } from "./context/ToastContext";
 
 // Lazy load components for better performance
 const Home = React.lazy(() => import("./pages/Home"));
@@ -33,6 +34,7 @@ const Profile = React.lazy(() => import("./pages/Profile"));
 const AdminDashboard = React.lazy(() => import("./pages/AdminDashboard"));
 const AdminUsers = React.lazy(() => import("./pages/AdminUsers"));
 const Checkout = React.lazy(() => import("./pages/Checkout"));
+const OrderHistory = React.lazy(() => import("./pages/OrderHistory"));
 
 // Loading component for suspense fallback
 const LoadingSpinner = () => (
@@ -91,44 +93,53 @@ function App() {
       <HelmetProvider>
         <AuthProvider>
           <CartProvider>
-            <BrowserRouter>
-              <div className="min-h-screen flex flex-col bg-gray-50">
-                <Navbar />
-                <main className="flex-grow">
-                  <Suspense fallback={<LoadingSpinner />}>
-                    <Routes>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/shop" element={<Shop />} />
-                      <Route path="/product/:id" element={<ProductDetail />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/checkout" element={<Checkout />} />
-                      <Route path="/blog" element={<Blog />} />
-                      <Route path="/about" element={<About />} />
-                      <Route path="/legal" element={<Legal />} />
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/shipping" element={<Shipping />} />
-                      <Route path="/returns" element={<Returns />} />
-                      <Route path="/faq" element={<FAQ />} />
-                      <Route path="/size-guide" element={<SizeGuide />} />
-                      <Route path="/privacy" element={<Privacy />} />
-                      <Route path="/terms" element={<Terms />} />
-                      <Route path="/gdpr" element={<GDPR />} />
-                      <Route path="/cookies" element={<Cookies />} />
-                      <Route path="/custom-design" element={<CustomDesign />} />
-                      <Route path="/search" element={<SearchResults />} />
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/register" element={<Register />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/admin" element={<AdminDashboard />} />
-                      <Route path="/admin/users" element={<AdminUsers />} />
-                      {/* Catch all route for 404 */}
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </Suspense>
-                </main>
-                <Footer />
-              </div>
-            </BrowserRouter>
+            <ToastProvider>
+              <BrowserRouter>
+                <div className="min-h-screen flex flex-col bg-gray-50">
+                  <Navbar />
+                  <main className="flex-grow">
+                    <Suspense fallback={<LoadingSpinner />}>
+                      <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/shop" element={<Shop />} />
+                        <Route
+                          path="/product/:id"
+                          element={<ProductDetail />}
+                        />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/blog" element={<Blog />} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/legal" element={<Legal />} />
+                        <Route path="/contact" element={<Contact />} />
+                        <Route path="/shipping" element={<Shipping />} />
+                        <Route path="/returns" element={<Returns />} />
+                        <Route path="/faq" element={<FAQ />} />
+                        <Route path="/size-guide" element={<SizeGuide />} />
+                        <Route path="/privacy" element={<Privacy />} />
+                        <Route path="/terms" element={<Terms />} />
+                        <Route path="/gdpr" element={<GDPR />} />
+                        <Route path="/cookies" element={<Cookies />} />
+                        <Route
+                          path="/custom-design"
+                          element={<CustomDesign />}
+                        />
+                        <Route path="/search" element={<SearchResults />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/orders" element={<OrderHistory />} />
+                        <Route path="/admin" element={<AdminDashboard />} />
+                        <Route path="/admin/users" element={<AdminUsers />} />
+                        {/* Catch all route for 404 */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </Suspense>
+                  </main>
+                  <Footer />
+                </div>
+              </BrowserRouter>
+            </ToastProvider>
           </CartProvider>
         </AuthProvider>
       </HelmetProvider>

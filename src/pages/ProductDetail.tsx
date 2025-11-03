@@ -1,18 +1,27 @@
-import React, { useState } from 'react';
-import { Helmet } from 'react-helmet-async';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Star, ShoppingCart } from 'lucide-react';
-import { products } from '../data/products';
-import { useCart } from '../context/CartContext';
+import React, { useMemo, useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { useParams, useNavigate } from "react-router-dom";
+import { Star, ShoppingCart } from "lucide-react";
+import { products } from "../data/products";
+import { useCart } from "../context/CartContext";
+import ShareButtons from "../components/ShareButtons";
+import { useToast } from "../context/ToastContext";
 
 function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { dispatch } = useCart();
-  const product = products.find(p => p.id === Number(id));
+  const { showToast } = useToast();
+  const product = products.find((p) => p.id === Number(id));
+  const shareUrl = useMemo(() => {
+    if (typeof window !== "undefined") {
+      return window.location.href;
+    }
+    return `https://aitshirts.in/product/${id}`;
+  }, [id]);
 
-  const [selectedSize, setSelectedSize] = useState('');
-  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedSize, setSelectedSize] = useState("");
+  const [selectedColor, setSelectedColor] = useState("");
 
   if (!product) {
     return (
@@ -24,12 +33,16 @@ function ProductDetail() {
 
   const handleAddToCart = () => {
     if (!selectedSize || !selectedColor) {
-      alert('Please select both size and color');
+      showToast({
+        title: "Select size and color",
+        description: "Choose both before adding this tee to your cart.",
+        variant: "info",
+      });
       return;
     }
 
     dispatch({
-      type: 'ADD_TO_CART',
+      type: "ADD_TO_CART",
       payload: {
         product,
         quantity: 1,
@@ -38,17 +51,20 @@ function ProductDetail() {
       },
     });
 
-    navigate('/cart');
+    showToast({
+      title: "Added to cart",
+      description: `${product.name} is now in your cart.`,
+      variant: "success",
+    });
+
+    navigate("/cart");
   };
 
   return (
     <>
       <Helmet>
         <title>{`${product.name} | AI Tees`}</title>
-        <meta
-          name="description"
-          content={product.description}
-        />
+        <meta name="description" content={product.description} />
       </Helmet>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -86,8 +102,8 @@ function ProductDetail() {
                     onClick={() => setSelectedSize(size)}
                     className={`w-12 h-12 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-50 ${
                       selectedSize === size
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-300 hover:border-indigo-600'
+                        ? "border-indigo-600 bg-indigo-50"
+                        : "border-gray-300 hover:border-indigo-600"
                     }`}
                   >
                     {size}
@@ -106,8 +122,8 @@ function ProductDetail() {
                     onClick={() => setSelectedColor(color)}
                     className={`px-4 py-2 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-opacity-50 ${
                       selectedColor === color
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-300 hover:border-indigo-600'
+                        ? "border-indigo-600 bg-indigo-50"
+                        : "border-gray-300 hover:border-indigo-600"
                     }`}
                   >
                     {color}
@@ -124,6 +140,14 @@ function ProductDetail() {
               <ShoppingCart className="h-5 w-5" />
               <span>Add to Cart</span>
             </button>
+
+            <div className="mt-6">
+              <ShareButtons
+                url={shareUrl}
+                title={`Check out ${product.name} on AI Tees`}
+                text={`Loving this design: ${product.name}`}
+              />
+            </div>
           </div>
         </div>
       </div>

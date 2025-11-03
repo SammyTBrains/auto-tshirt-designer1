@@ -2,9 +2,11 @@
 New API routes for authentication, user management, orders, and admin features
 """
 import logging
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from server.db_models import (
     UserCreate, UserResponse, UserUpdate, LoginRequest, Token,
@@ -27,7 +29,9 @@ from server.crud import (
 from server.payment_service import payment_service
 from server.email_service import email_service
 from server.telegram_service import telegram_service
+from server.printify_service import printify_service
 from server.database import db
+from server.config_service import config_service
 
 
 async def ensure_db_connected() -> bool:
@@ -50,6 +54,71 @@ user_router = APIRouter(prefix="/api/users", tags=["Users"])
 design_router = APIRouter(prefix="/api/designs", tags=["Designs"])
 order_router = APIRouter(prefix="/api/orders", tags=["Orders"])
 admin_router = APIRouter(prefix="/api/admin", tags=["Admin"])
+config_router = APIRouter(prefix="/api/config", tags=["Configuration"])
+
+
+@config_router.get("/public")
+async def get_public_runtime_config():
+    """Return a sanitized runtime configuration payload for client consumption."""
+
+    settings = await config_service.get_settings()
+    return config_service.build_public_payload(settings)
+
+
+class RuntimeConfigUpdate(BaseModel):
+    updates: Dict[str, Dict[str, Any]] = Field(..., description="Nested configuration updates")
+
+
+@admin_router.get("/config")
+async def get_runtime_config(current_user: TokenData = Depends(get_current_admin_user)):
+    """Return runtime configuration for the admin dashboard."""
+
+    settings = await config_service.get_settings()
+    return {
+        "settings": config_service.build_admin_payload(settings),
+        "masked": config_service.build_masked_payload(settings),
+    }
+
+
+@admin_router.patch("/config")
+async def update_runtime_config(
+    payload: RuntimeConfigUpdate,
+    current_user: TokenData = Depends(get_current_admin_user),
+):
+    """Persist runtime configuration updates submitted from the admin UI."""
+
+    if not payload.updates:
+        raise HTTPException(status_code=400, detail="No configuration updates provided")
+
+    try:
+        existing = await config_service.get_settings()
+        allowed_sections = set(existing.keys())
+        invalid_sections = [section for section in payload.updates.keys() if section not in allowed_sections]
+        if invalid_sections:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown configuration namespaces: {', '.join(invalid_sections)}",
+            )
+
+        updated = await config_service.update_settings(payload.updates)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return {
+        "settings": config_service.build_admin_payload(updated),
+        "masked": config_service.build_masked_payload(updated),
+    }
+
+
+@admin_router.post("/config/refresh")
+async def refresh_runtime_config(current_user: TokenData = Depends(get_current_admin_user)):
+    """Force reload of configuration from the database and re-notify subscribers."""
+
+    updated = await config_service.refresh_now()
+    return {
+        "settings": config_service.build_admin_payload(updated),
+        "masked": config_service.build_masked_payload(updated),
+    }
 
 # Authentication routes
 @auth_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -337,8 +406,18 @@ async def confirm_order_payment(
             detail=f"Payment not confirmed (status: {current_status})"
         )
     
+    printify_extra: Dict[str, Any] = {}
+    if printify_service.is_enabled():
+        try:
+            printify_response = await printify_service.submit_order(order)
+            if printify_response:
+                printify_extra["printify_order_id"] = str(printify_response.get("id") or "")
+                printify_extra["printify_status"] = printify_response.get("status")
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error("Printify submission failed for order %s: %s", order.order_number, exc, exc_info=True)
+
     # Update order status
-    updated_order = await update_order_status(order_id, OrderStatus.PAID)
+    updated_order = await update_order_status(order_id, OrderStatus.PAID, **printify_extra)
     
     # Process store credits for design purchases
     for item in order.items:
@@ -475,3 +554,50 @@ async def send_daily_analytics_report(current_user: TokenData = Depends(get_curr
     )
     
     return {"success": success, "analytics": analytics}
+
+
+@admin_router.post("/printify/test")
+async def test_printify_connection(current_user: TokenData = Depends(get_current_admin_user)):
+    """Verify Printify credentials without placing an order."""
+
+    ok, payload = await printify_service.test_connection()
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=payload)
+    return payload
+
+
+@admin_router.post("/printify/orders/{order_id}/sync")
+async def sync_order_to_printify(
+    order_id: str,
+    current_user: TokenData = Depends(get_current_admin_user),
+):
+    """Manually push an order to Printify or re-sync its status."""
+
+    if not printify_service.is_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Printify integration is not configured",
+        )
+
+    order = await get_order_by_id(order_id)
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+
+    response = await printify_service.submit_order(order)
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to push order to Printify",
+        )
+
+    updated_order = await update_order_status(
+        order_id,
+        order.status,
+        printify_order_id=str(response.get("id") or ""),
+        printify_status=response.get("status"),
+    )
+
+    return {
+        "printify": response,
+        "order": updated_order,
+    }

@@ -11,6 +11,7 @@ import {
   Pipette,
   Plus,
   Minus,
+  Download,
 } from "lucide-react";
 import { ColorPicker } from "../../components/TShirtCustomizer/ColorPicker";
 import { SizeSelector } from "../../components/TShirtCustomizer/SizeSelector";
@@ -19,12 +20,16 @@ import { DesignService } from "../../services/designService";
 import { DesignTransform } from "./types";
 import { DraggableDesign } from "../../components/DraggableDesign/DraggableDesign";
 import { useCart } from "../../context/CartContext";
+import { useToast } from "../../context/ToastContext";
+import { runtimeConfigService } from "../../services/runtimeConfigService";
+import { exportBase64Image } from "../../utils/designExport";
 import type { PercentCrop } from "react-image-crop";
 import "react-image-crop/dist/ReactCrop.css";
 
 const CustomDesign: React.FC = () => {
   const navigate = useNavigate();
   const { dispatch } = useCart();
+  const { showToast } = useToast();
   const [tShirtColor, setTShirtColor] = useState("#ffffff");
   const [designColor, setDesignColor] = useState<string>("#000000");
   const [colorIntensity, setColorIntensity] = useState(0);
@@ -45,7 +50,7 @@ const CustomDesign: React.FC = () => {
   const [isCropping, setIsCropping] = useState(false);
   const [crop, setCrop] = useState<PercentCrop>();
   const [isPickingDesignColor, setIsPickingDesignColor] = useState(false);
-  const [designHistory, setDesignHistory] = useState<string[]>([]);
+  const [exportEnabled, setExportEnabled] = useState(false);
   const designCanvasRef = useRef<HTMLDivElement>(null);
   const [designCanvasSize, setDesignCanvasSize] = useState({
     width: 0,
@@ -102,8 +107,18 @@ const CustomDesign: React.FC = () => {
       }
     };
 
+    const loadFeatureFlags = async () => {
+      try {
+        const config = await runtimeConfigService.getPublicConfig();
+        setExportEnabled(config.features?.design_export_enabled ?? false);
+      } catch (error) {
+        console.error("Failed to load feature flags:", error);
+      }
+    };
+
     checkAPI();
     loadHistory();
+    loadFeatureFlags();
   }, []);
 
   useEffect(() => {
@@ -297,16 +312,50 @@ const CustomDesign: React.FC = () => {
     dispatch({ type: "ADD_TO_CART", payload: cartItem });
 
     // Show success message and navigate to cart
-    alert("Added to cart successfully!");
+    showToast({
+      title: "Added to cart",
+      description: "Your custom tee is waiting in the cart.",
+      variant: "success",
+    });
     navigate("/cart");
   };
 
-  const handleSuccessfulGeneration = async (designUrl: string) => {
+  const handleExportDesign = (format: "png" | "pdf") => {
+    if (!designTexture) {
+      showToast({
+        title: "No design to export",
+        description: "Please create a design first.",
+        variant: "error",
+      });
+      return;
+    }
+
+    try {
+      const filename = `ai-tshirt-design-${Date.now()}`;
+      exportBase64Image(designTexture, filename, format);
+      showToast({
+        title: "Design exported",
+        description: `Your design has been downloaded as ${format.toUpperCase()}.`,
+        variant: "success",
+      });
+    } catch (error) {
+      showToast({
+        title: "Export failed",
+        description:
+          error instanceof Error ? error.message : "Failed to export design",
+        variant: "error",
+      });
+    }
+  };
+
+  const handleSuccessfulGeneration = (designUrl: string) => {
     if (currentObjectUrl.current) {
       URL.revokeObjectURL(currentObjectUrl.current);
     }
     setDesignTexture(designUrl);
-    await DesignService.saveDesignToHistory(designUrl);
+    void DesignService.saveDesignToHistory(designUrl).catch((saveError) => {
+      console.error("Failed to persist design history:", saveError);
+    });
     // Only add to history if it's not already there
     setPreviousDesigns((prev) => {
       if (!prev.includes(designUrl)) {
@@ -339,7 +388,7 @@ const CustomDesign: React.FC = () => {
     try {
       const designUrl = await DesignService.generateDesign(prompt);
       if (designUrl) {
-        await handleSuccessfulGeneration(designUrl);
+        handleSuccessfulGeneration(designUrl);
       } else {
         throw new Error("Failed to generate design");
       }
@@ -853,6 +902,27 @@ const CustomDesign: React.FC = () => {
               <div className="bg-red-50 text-red-600 p-3 rounded-lg flex items-center gap-2 transition-all duration-300">
                 <AlertCircle className="w-5 h-5 transition-all duration-300" />
                 <p className="text-sm transition-all duration-300">{error}</p>
+              </div>
+            )}
+
+            {exportEnabled && designTexture && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleExportDesign("png")}
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition-all duration-200 flex items-center justify-center gap-2"
+                  disabled={isGenerating}
+                >
+                  <Download className="w-4 h-4" />
+                  PNG
+                </button>
+                <button
+                  onClick={() => handleExportDesign("pdf")}
+                  className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow-md transition-all duration-200 flex items-center justify-center gap-2"
+                  disabled={isGenerating}
+                >
+                  <Download className="w-4 h-4" />
+                  PDF
+                </button>
               </div>
             )}
 

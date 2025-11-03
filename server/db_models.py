@@ -124,6 +124,8 @@ class Order(OrderBase):
     payment_intent_id: Optional[str] = None
     tracking_number: Optional[str] = None
     notes: Optional[str] = None
+    printify_order_id: Optional[str] = None
+    printify_status: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     paid_at: Optional[datetime] = None
